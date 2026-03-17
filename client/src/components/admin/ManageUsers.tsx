@@ -1,9 +1,8 @@
 import type { FormEvent } from 'react'
-import { useEffect, useMemo, useState } from 'react'
+import { useState, useEffect} from 'react'
 import { useAuthStore } from '../../stores/authStore'
 import { LoadingSpinner } from '../common/LoadingSpinner'
-
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000'
+import api from '../../api/axios'
 
 type UserRow = {
   id: number
@@ -16,7 +15,7 @@ type UserRow = {
 }
 
 export function ManageUsers() {
-  const { token, user } = useAuthStore()
+  const { user } = useAuthStore()
 
   const [users, setUsers] = useState<UserRow[]>([])
   const [isLoading, setIsLoading] = useState(false)
@@ -32,112 +31,93 @@ export function ManageUsers() {
   const [successMessage, setSuccessMessage] = useState<string | null>(null)
   const [pendingRole, setPendingRole] = useState<Record<number, 'STUDENT' | 'INSTRUCTOR'>>({})
 
-  const authHeaders = useMemo(() => {
-    if (!token) return null
-    return { Authorization: `Bearer ${token}` }
-  }, [token])
 
   const fetchUsers = async () => {
-    if (!authHeaders) return
     try {
       setIsLoading(true)
       setError(null)
-      const res = await fetch(`${API_BASE_URL}/api/users`, {
-        headers: {
-          ...authHeaders,
-        },
-      })
-      const data = await res.json().catch(() => ({}))
-      if (!res.ok) throw new Error(data.message || 'Failed to fetch users')
-      setUsers(data.users || [])
-    } catch (err: any) {
-      setError(err.message || 'Failed to fetch users')
+      const res = await api.get('/api/users')
+      setUsers(Array.isArray(res.data) ? res.data : [])
+    } catch (err: unknown) {
+      setError((err as Error).message || 'Failed to fetch users')
     } finally {
       setIsLoading(false)
     }
   }
 
-  useEffect(() => {
+    useEffect(() => {
     fetchUsers()
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [token])
+  }, [])
 
   const handleCreateInstructor = async (e: FormEvent) => {
     e.preventDefault()
-    if (!authHeaders) {
-      setError('Missing auth token. Please login again.')
-      return
-    }
-
     try {
       setIsSubmitting(true)
       setError(null)
       setSuccessMessage(null)
 
-      const res = await fetch(`${API_BASE_URL}/api/users/create-instructor`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          ...authHeaders,
-        },
-        body: JSON.stringify({
-          name: instName,
-          email: instEmail,
-          password: instPassword,
-        }),
+      const res = await api.post('/api/users/create-instructor', {
+        name: instName,
+        email: instEmail,
+        password: instPassword,
       })
-      const data = await res.json().catch(() => ({}))
-      if (!res.ok) throw new Error(data.message || 'Failed to create instructor')
 
+      // ✅ instant update — no refetch needed
+      setUsers(prev => [res.data, ...prev])
       setSuccessMessage('Instructor created successfully.')
       setInstName('')
       setInstEmail('')
       setInstPassword('')
       setShowInstructorForm(false)
-      await fetchUsers()
     } catch (err: any) {
-      setError(err.message || 'Failed to create instructor')
+      setError(err.response?.data?.message || 'Failed to create instructor')
     } finally {
       setIsSubmitting(false)
     }
   }
 
   const toggleStatus = async (targetId: number) => {
-    if (!authHeaders) return
     try {
       setError(null)
-      const res = await fetch(`${API_BASE_URL}/api/users/${targetId}/toggle-status`, {
-        method: 'PATCH',
-        headers: {
-          ...authHeaders,
-        },
-      })
-      const data = await res.json().catch(() => ({}))
-      if (!res.ok) throw new Error(data.message || 'Failed to toggle user status')
-      await fetchUsers()
+      await api.patch(`/api/users/${targetId}/toggle-status`)
+      // ✅ instant update
+      setUsers(prev =>
+        prev.map(u => u.id === targetId ? { ...u, isActive: !u.isActive } : u)
+      )
     } catch (err: any) {
-      setError(err.message || 'Failed to toggle user status')
+      setError(err.response?.data?.message || 'Failed to toggle status')
     }
   }
 
   const deleteUser = async (targetId: number) => {
-    if (!authHeaders) return
-    const ok = window.confirm('Are you sure you want to delete this user?')
-    if (!ok) return
-
+    if (!window.confirm('Are you sure you want to delete this user?')) return
     try {
       setError(null)
-      const res = await fetch(`${API_BASE_URL}/api/users/${targetId}`, {
-        method: 'DELETE',
-        headers: {
-          ...authHeaders,
-        },
-      })
-      const data = await res.json().catch(() => ({}))
-      if (!res.ok) throw new Error(data.message || 'Failed to delete user')
-      await fetchUsers()
+      await api.delete(`/api/users/${targetId}`)
+      // ✅ instant update
+      setUsers(prev => prev.filter(u => u.id !== targetId))
     } catch (err: any) {
-      setError(err.message || 'Failed to delete user')
+      setError(err.response?.data?.message || 'Failed to delete user')
+    }
+  }
+
+    const updateRole = async (userId: number) => {
+    try {
+      setError(null)
+      const role = pendingRole[userId]
+      if (!role) return
+      await api.patch(`/api/users/${userId}/role`, { role })
+      // ✅ instant update
+      setUsers(prev =>
+        prev.map(u => u.id === userId ? { ...u, role } : u)
+      )
+      setPendingRole(prev => {
+        const updated = { ...prev }
+        delete updated[userId]
+        return updated
+      })
+    } catch (err: any) {
+      setError(err.response?.data?.message || 'Failed to update role')
     }
   }
 
@@ -146,10 +126,10 @@ export function ManageUsers() {
   const filteredUsers = users.filter((u) => {
     const q = search.trim().toLowerCase()
     const matchesQuery = !q || u.name.toLowerCase().includes(q) || u.email.toLowerCase().includes(q)
-    const matchesRole =
-      roleFilter === 'ALL' ? true : roleFilter === 'STUDENT' ? u.role === 'STUDENT' : u.role === 'INSTRUCTOR'
+    const matchesRole = roleFilter === 'ALL' ? true : u.role === roleFilter
     return matchesQuery && matchesRole
   })
+
 
   return (
     <section className="bg-white rounded-lg shadow-sm border border-[#E0DED8] p-5">
@@ -167,7 +147,7 @@ export function ManageUsers() {
           {showInstructorForm ? 'Close' : 'Create Instructor'}
         </button>
       </div>
-
+      {/* Search + Filters */}
       <div className="flex flex-col md:flex-row md:items-center gap-3 mb-4">
         <div className="flex-1">
           <input
@@ -189,7 +169,7 @@ export function ManageUsers() {
           </select>
         </div>
       </div>
-
+      {/* Create Instructor Form */}
       {showInstructorForm && (
         <form onSubmit={handleCreateInstructor} className="space-y-4 mb-5">
           <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
@@ -258,111 +238,99 @@ export function ManageUsers() {
               </tr>
             </thead>
             <tbody>
-              {filteredUsers.map((u) => (
-                <tr key={u.id} className="border-t border-[#E0DED8]">
-                  <td className="px-3 py-2">{u.name}</td>
-                  <td className="px-3 py-2">{u.email}</td>
-                  <td className="px-3 py-2">
-                    {u.role === 'ADMIN' ? (
-                      <span className="font-semibold">{u.role}</span>
-                    ) : (
-                      <div className="flex items-center gap-2">
-                        <select
-                          value={(pendingRole[u.id] || u.role) as any}
-                          onChange={(e) =>
-                            setPendingRole((prev) => ({
-                              ...prev,
-                              [u.id]: e.target.value as any,
-                            }))
-                          }
-                          className="rounded-md border border-[#D4D2CC] px-2 py-1 text-sm bg-[#F4F3EE] outline-none focus:ring-2 focus:ring-[#08A696]"
-                        >
-                          <option value="STUDENT">STUDENT</option>
-                          <option value="INSTRUCTOR">INSTRUCTOR</option>
-                        </select>
-                        <button
-                          onClick={async () => {
-                            if (!authHeaders) return
-                            try {
-                              setError(null)
-                              const res = await fetch(`${API_BASE_URL}/api/users/${u.id}/role`, {
-                                method: 'PATCH',
-                                headers: {
-                                  'Content-Type': 'application/json',
-                                  ...authHeaders,
-                                },
-                                body: JSON.stringify({ role: pendingRole[u.id] || u.role }),
-                              })
-                              const data = await res.json().catch(() => ({}))
-                              if (!res.ok) throw new Error(data.message || 'Failed to change role')
-                              await fetchUsers()
-                            } catch (err: any) {
-                              setError(err.message || 'Failed to change role')
-                            }
-                          }}
-                          className="px-2 py-1 rounded-md bg-[#08A696] text-[#141413] text-xs font-semibold hover:opacity-90"
-                        >
-                          Save
-                        </button>
-                      </div>
-                    )}
-                  </td>
-                  <td className="px-3 py-2">
-                    <span
-                      className={
-                        u.isActive
-                          ? 'inline-flex items-center rounded-full bg-[#E6FAF7] text-[#057A6E] px-2 py-0.5 text-xs font-medium'
-                          : 'inline-flex items-center rounded-full bg-[#FDECEC] text-[#B42318] px-2 py-0.5 text-xs font-medium'
-                      }
-                    >
-                      {u.isActive ? 'ACTIVE' : 'INACTIVE'}
-                    </span>
-                  </td>
-                  <td className="px-3 py-2">
-                    <div className="flex justify-end gap-2">
-                      <button
-                        onClick={() => toggleStatus(u.id)}
-                        className="px-3 py-1 rounded-md border border-[#D4D2CC] bg-white hover:bg-[#F4F3EE]"
-                        disabled={u.role === 'ADMIN'}
-                      >
-                        Toggle
-                      </button>
-                      <button
-                        onClick={() => deleteUser(u.id)}
-                        className="px-3 py-1 rounded-md bg-[#141413] text-[#F4F3EE] hover:opacity-90"
-                        disabled={u.role === 'ADMIN'}
-                      >
-                        Delete
-                      </button>
-                    </div>
-                  </td>
-                </tr>
-              ))}
               {filteredUsers.length === 0 ? (
                 <tr>
                   <td className="px-3 py-4 text-[#6B6A66]" colSpan={5}>
                     No users found.
                   </td>
                 </tr>
-              ) : null}
+              ) : (
+                filteredUsers.map((u) => (
+                  <tr key={u.id} className="border-t border-[#E0DED8]">
+                    <td className="px-3 py-2">{u.name}</td>
+                    <td className="px-3 py-2">{u.email}</td>
+
+                    {/* Role */}
+                    <td className="px-3 py-2">
+                      {u.role === 'ADMIN' ? (
+                        <span className="font-semibold">{u.role}</span>
+                      ) : (
+                        <div className="flex items-center gap-2">
+                          <select
+                            value={pendingRole[u.id] || u.role}
+                            onChange={(e) =>
+                              setPendingRole(prev => ({
+                                ...prev,
+                                [u.id]: e.target.value as any,
+                              }))
+                            }
+                            className="rounded-md border border-[#D4D2CC] px-2 py-1 text-sm bg-[#F4F3EE] outline-none focus:ring-2 focus:ring-[#08A696]"
+                          >
+                            <option value="STUDENT">STUDENT</option>
+                            <option value="INSTRUCTOR">INSTRUCTOR</option>
+                          </select>
+                          <button
+                            onClick={() => updateRole(u.id)}
+                            className="px-2 py-1 rounded-md bg-[#08A696] text-[#141413] text-xs font-semibold hover:opacity-90"
+                          >
+                            Save
+                          </button>
+                        </div>
+                      )}
+                    </td>
+
+                    {/* Status */}
+                    <td className="px-3 py-2">
+                      <span className={
+                        u.isActive
+                          ? 'inline-flex items-center rounded-full bg-[#E6FAF7] text-[#057A6E] px-2 py-0.5 text-xs font-medium'
+                          : 'inline-flex items-center rounded-full bg-[#FDECEC] text-[#B42318] px-2 py-0.5 text-xs font-medium'
+                      }>
+                        {u.isActive ? 'ACTIVE' : 'INACTIVE'}
+                      </span>
+                    </td>
+
+                    {/* Actions */}
+                    <td className="px-3 py-2">
+                      <div className="flex justify-end gap-2">
+                        <button
+                          onClick={() => toggleStatus(u.id)}
+                          disabled={u.role === 'ADMIN'}
+                          className="px-3 py-1 rounded-md border border-[#D4D2CC] bg-white hover:bg-[#F4F3EE] disabled:opacity-40"
+                        >
+                          Toggle
+                        </button>
+                        <button
+                          onClick={() => deleteUser(u.id)}
+                          disabled={u.role === 'ADMIN'}
+                          className="px-3 py-1 rounded-md bg-[#141413] text-[#F4F3EE] hover:opacity-90 disabled:opacity-40"
+                        >
+                          Delete
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                ))
+              )}
             </tbody>
           </table>
         </div>
       )}
 
-      {error ? (
+      {/* Error */}
+      {error && (
         <p className="mt-3 text-sm text-red-700 bg-red-50 border border-red-100 rounded-md px-3 py-2">
           {error}
         </p>
-      ) : null}
+      )}
 
-      {successMessage ? (
+      {/* Success */}
+      {successMessage && (
         <p className="mt-3 text-sm text-green-800 bg-green-50 border border-green-100 rounded-md px-3 py-2">
           {successMessage}
         </p>
-      ) : null}
+      )}
     </section>
   )
 }
-
-
+  

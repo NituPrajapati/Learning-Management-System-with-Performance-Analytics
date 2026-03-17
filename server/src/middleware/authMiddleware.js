@@ -1,30 +1,31 @@
-import jwt from "jsonwebtoken";
+import jwt from 'jsonwebtoken'
 
-export const authMiddleware = (req, res, next) => {
-  const authHeader = req.headers.authorization;
-
-  if (!authHeader || !authHeader.startsWith("Bearer ")) {
-    return res.status(401).json({ message: "Authorization token missing" });
-  }
-
-  const token = authHeader.split(" ")[1];
-
+export const protect = (req, res, next) => {
   try {
-    const decoded = jwt.verify(token, process.env.JWT_SECRET);
-    req.user = decoded;
-    return next();
-  } catch (error) {
-    return res.status(401).json({ message: "Invalid or expired token" });
-  }
-};
+    const authHeader = req.headers.authorization
 
-export const roleMiddleware = (...allowedRoles) => {
-  return (req, res, next) => {
-    if (!req.user || !allowedRoles.includes(req.user.role)) {
-      return res.status(403).json({ message: "Forbidden: insufficient permissions" });
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+      return res.status(401).json({ message: 'No token provided' })
     }
-    return next();
-  };
-};
 
+    const token = authHeader.split(' ')[1]
+    const decoded = jwt.verify(token, process.env.JWT_SECRET)
+    req.user = decoded
+    next()
+  } catch (error) {
+    return res.status(401).json({ message: 'Invalid or expired token' })
+  }
+}
 
+export const allowRoles = (...roles) => {
+  return (req, res, next) => {
+    if (!roles.includes(req.user.role)) {
+      return res.status(403).json({
+        message: `Access denied. Required: ${roles.join(' or ')}`
+      })
+    }
+    next()
+  }
+}
+// Add this at the bottom of authMiddleware.js:
+export const authMiddleware = protect

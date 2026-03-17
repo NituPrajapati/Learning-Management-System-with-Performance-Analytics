@@ -79,3 +79,6 @@ coverage/
 .parcel-cache/
 .turbo/
 .vercel/
+
+lms_system_architecture.pdf
+DATABASE_MIGRATION.md

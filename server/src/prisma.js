@@ -1,8 +1,6 @@
-import pkg from "@prisma/client";
+import { PrismaClient, CourseType, CourseLevel, Role } from '@prisma/client'
 
-const { PrismaClient, Role } = pkg;
+const prisma = new PrismaClient()
 
-const prisma = new PrismaClient({});
-
-export { Role };
-export default prisma;
+export { CourseType, CourseLevel, Role }
+export default prisma

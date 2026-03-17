@@ -1,10 +1,11 @@
 import type { FormEvent } from 'react'
 import { useEffect, useState } from 'react'
-import { Link, useNavigate } from 'react-router-dom'
+import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 import { useAuthStore } from '../../stores/authStore'
 
 export function Login() {
   const navigate = useNavigate()
+  const [searchParams] = useSearchParams()
   const { login, user, isLoading, error } = useAuthStore()
 
   const [email, setEmail] = useState('')
@@ -12,10 +13,15 @@ export function Login() {
 
   useEffect(() => {
     if (!user) return
-    if (user.role === 'ADMIN') navigate('/admin/dashboard', { replace: true })
-    else if (user.role === 'INSTRUCTOR') navigate('/instructor/dashboard', { replace: true })
-    else navigate('/student/dashboard', { replace: true })
-  }, [navigate, user])
+    const redirect = searchParams.get('redirect')
+    if (redirect) {
+      navigate(redirect, { replace: true })
+    } else {
+      if (user.role === 'ADMIN') navigate('/admin/dashboard', { replace: true })
+      else if (user.role === 'INSTRUCTOR') navigate('/instructor/dashboard', { replace: true })
+      else navigate('/student/dashboard', { replace: true })
+    }
+  }, [navigate, user, searchParams])
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault()
@@ -77,5 +83,7 @@ export function Login() {
     </div>
   )
 }
+
+
 
 

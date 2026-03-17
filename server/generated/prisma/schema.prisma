@@ -1,0 +1,294 @@
+generator client {
+  provider = "prisma-client-js"
+  output   = "../generated/prisma"
+}
+
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
+
+// ─────────────────────────────────────────
+// USERS & ROLES
+// ─────────────────────────────────────────
+
+model User {
+  id           Int      @id @default(autoincrement())
+  name         String
+  email        String   @unique
+  password     String
+  role         Role     @default(STUDENT)
+  profileImage String?
+  isActive     Boolean  @default(true)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  // Relations
+  taughtCourses  Course[]         @relation("InstructorCourses")
+  enrollments    Enrollment[]
+  savedCourses   SavedCourse[]    @relation("SavedCourses")
+  quizAttempts   QuizAttempt[]
+  activityLogs   ActivityLog[]
+  moduleProgress ModuleProgress[]
+
+  @@map("users")
+}
+
+enum Role {
+  ADMIN
+  INSTRUCTOR
+  STUDENT
+}
+
+// ─────────────────────────────────────────
+// COURSES
+// ─────────────────────────────────────────
+
+model Course {
+  id            Int         @id @default(autoincrement())
+  title         String
+  description   String      @db.Text
+  thumbnail     String?
+  durationWeeks Int? // duration in weeks (or months if you prefer)
+  courseType    CourseType  @default(FREE)
+  level         CourseLevel @default(BEGINNER)
+  isPublished   Boolean     @default(false)
+  instructorId  Int
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
+
+  // Relations
+  instructor   User          @relation("InstructorCourses", fields: [instructorId], references: [id])
+  modules      Module[]
+  enrollments  Enrollment[]
+  savedCourses SavedCourse[]
+  activityLogs ActivityLog[]
+
+  @@map("courses")
+}
+
+enum CourseLevel {
+  BEGINNER
+  INTERMEDIATE
+  ADVANCED
+}
+
+enum CourseType {
+  FREE
+  PAID
+}
+
+// ─────────────────────────────────────────
+// MODULES
+// ─────────────────────────────────────────
+
+model Module {
+  id          Int         @id @default(autoincrement())
+  title       String
+  description String?     @db.Text
+  orderIndex  Int // 1, 2, 3 — controls sequence
+  contentType ContentType
+  contentUrl  String? // video URL or file URL
+  contentText String?     @db.LongText // for text-based content
+  duration    Int? // in minutes
+  isPublished Boolean     @default(false)
+  courseId    Int
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
+
+  // Relations
+  course         Course           @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  quiz           Quiz?
+  moduleProgress ModuleProgress[]
+  activityLogs   ActivityLog[]
+
+  @@map("modules")
+}
+
+enum ContentType {
+  VIDEO
+  PDF
+  TEXT
+  LINK
+}
+
+// ─────────────────────────────────────────
+// ENROLLMENTS
+// ─────────────────────────────────────────
+
+model Enrollment {
+  id             Int              @id @default(autoincrement())
+  studentId      Int
+  courseId       Int
+  enrolledAt     DateTime         @default(now())
+  expiresAt      DateTime? // calculated from course duration + enrolledAt
+  completedAt    DateTime?
+  status         EnrollmentStatus @default(ACTIVE)
+  completionRate Float            @default(0) // 0 to 100 percent
+
+  // Relations
+  student User   @relation(fields: [studentId], references: [id])
+  course  Course @relation(fields: [courseId], references: [id])
+
+  @@unique([studentId, courseId]) // prevent double enrollment
+  @@map("enrollments")
+}
+
+enum EnrollmentStatus {
+  ACTIVE
+  COMPLETED
+  DROPPED
+  EXPIRED
+}
+
+// ─────────────────────────────────────────
+// SAVED COURSES (Bookmarks)
+// ─────────────────────────────────────────
+
+model SavedCourse {
+  id        Int      @id @default(autoincrement())
+  studentId Int
+  courseId  Int
+  createdAt DateTime @default(now())
+
+  // RelationsFcours
+  student User   @relation("SavedCourses", fields: [studentId], references: [id], onDelete: Cascade)
+  course  Course @relation(fields: [courseId], references: [id], onDelete: Cascade)
+
+  @@unique([studentId, courseId]) // prevent duplicate bookmarks
+  @@map("saved_courses")
+}
+
+// ─────────────────────────────────────────
+// MODULE PROGRESS
+// ─────────────────────────────────────────
+
+model ModuleProgress {
+  id          Int       @id @default(autoincrement())
+  studentId   Int
+  moduleId    Int
+  courseId    Int
+  isCompleted Boolean   @default(false)
+  startedAt   DateTime  @default(now())
+  completedAt DateTime?
+  timeSpent   Int       @default(0) // in seconds
+
+  // Relations
+  student User   @relation(fields: [studentId], references: [id])
+  module  Module @relation(fields: [moduleId], references: [id])
+
+  @@unique([studentId, moduleId])
+  @@map("module_progress")
+}
+
+// ─────────────────────────────────────────
+// QUIZ
+// ─────────────────────────────────────────
+
+model Quiz {
+  id           Int      @id @default(autoincrement())
+  title        String
+  moduleId     Int      @unique // one quiz per module
+  timeLimit    Int? // in minutes, null = no limit
+  passingScore Int      @default(60) // percentage
+  maxAttempts  Int      @default(3)
+  createdAt    DateTime @default(now())
+
+  // Relations
+  module    Module        @relation(fields: [moduleId], references: [id], onDelete: Cascade)
+  questions Question[]
+  attempts  QuizAttempt[]
+
+  @@map("quizzes")
+}
+
+model Question {
+  id           Int          @id @default(autoincrement())
+  quizId       Int
+  questionText String       @db.Text
+  questionType QuestionType @default(MCQ)
+  orderIndex   Int
+  marks        Int          @default(1)
+
+  // Relations
+  quiz    Quiz     @relation(fields: [quizId], references: [id], onDelete: Cascade)
+  options Option[]
+
+  @@map("questions")
+}
+
+enum QuestionType {
+  MCQ
+  TRUE_FALSE
+}
+
+model Option {
+  id         Int     @id @default(autoincrement())
+  questionId Int
+  optionText String
+  isCorrect  Boolean @default(false)
+
+  // Relations
+  question Question @relation(fields: [questionId], references: [id], onDelete: Cascade)
+
+  @@map("options")
+}
+
+// ─────────────────────────────────────────
+// QUIZ ATTEMPTS
+// ─────────────────────────────────────────
+
+model QuizAttempt {
+  id            Int       @id @default(autoincrement())
+  studentId     Int
+  quizId        Int
+  score         Float // actual score achieved
+  totalMarks    Float // total possible marks
+  percentage    Float // score/totalMarks * 100
+  isPassed      Boolean
+  attemptNumber Int       @default(1)
+  startedAt     DateTime  @default(now())
+  submittedAt   DateTime?
+  answers       Json // store answers as JSON: [{questionId, selectedOptionId}]
+
+  // Relations
+  student User @relation(fields: [studentId], references: [id])
+  quiz    Quiz @relation(fields: [quizId], references: [id])
+
+  @@map("quiz_attempts")
+}
+
+// ─────────────────────────────────────────
+// ACTIVITY LOGS
+// ─────────────────────────────────────────
+
+model ActivityLog {
+  id        Int          @id @default(autoincrement())
+  studentId Int
+  courseId  Int?
+  moduleId  Int?
+  action    ActivityType
+  metadata  Json? // extra info: {score, duration, deviceType}
+  createdAt DateTime     @default(now())
+
+  // Relations
+  student User    @relation(fields: [studentId], references: [id])
+  course  Course? @relation(fields: [courseId], references: [id])
+  module  Module? @relation(fields: [moduleId], references: [id])
+
+  @@index([studentId]) // fast lookup by student
+  @@index([courseId]) // fast lookup by course
+  @@index([createdAt]) // fast time-range queries
+  @@map("activity_logs")
+}
+
+enum ActivityType {
+  LOGIN
+  LOGOUT
+  COURSE_ENROLLED
+  MODULE_STARTED
+  MODULE_COMPLETED
+  QUIZ_STARTED
+  QUIZ_SUBMITTED
+  CONTENT_VIEWED
+}

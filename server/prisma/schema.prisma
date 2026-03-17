@@ -1,5 +1,6 @@
 generator client {
   provider = "prisma-client-js"
+  //output   = "../generated/prisma"
 }
 
 datasource db {
@@ -25,6 +26,7 @@ model User {
   // Relations
   taughtCourses    Course[]        @relation("InstructorCourses")
   enrollments      Enrollment[]
+  savedCourses     SavedCourse[]   @relation("SavedCourses")
   quizAttempts     QuizAttempt[]
   activityLogs     ActivityLog[]
   moduleProgress   ModuleProgress[]
@@ -43,21 +45,25 @@ enum Role {
 // ─────────────────────────────────────────
 
 model Course {
-  id           Int          @id @default(autoincrement())
-  title        String
-  description  String       @db.Text
-  thumbnail    String?
-  duration     Int?         // total duration in minutes
-  level        CourseLevel  @default(BEGINNER)
-  isPublished  Boolean      @default(false)
-  instructorId Int
-  createdAt    DateTime     @default(now())
-  updatedAt    DateTime     @updatedAt
+  id            Int          @id @default(autoincrement())
+  title         String
+  slug          String?      @unique
+  description   String       @db.Text
+  thumbnail     String?
+  durationWeeks Int?
+  courseType    CourseType   @default(FREE)
+  level         CourseLevel  @default(BEGINNER)
+  price         Float?
+  isPublished   Boolean      @default(false)
+  instructorId  Int
+  createdAt     DateTime     @default(now())
+  updatedAt     DateTime     @updatedAt
 
   // Relations
   instructor   User         @relation("InstructorCourses", fields: [instructorId], references: [id])
   modules      Module[]
   enrollments  Enrollment[]
+  savedCourses SavedCourse[]
   activityLogs ActivityLog[]
 
   @@map("courses")
@@ -67,6 +73,11 @@ enum CourseLevel {
   BEGINNER
   INTERMEDIATE
   ADVANCED
+}
+
+enum CourseType {
+  FREE
+  PAID
 }
 
 // ─────────────────────────────────────────
@@ -112,8 +123,9 @@ model Enrollment {
   studentId        Int
   courseId         Int
   enrolledAt       DateTime         @default(now())
+  expiresAt        DateTime?        // calculated from course duration + enrolledAt
   completedAt      DateTime?
-  status           EnrollmentStatus @default(ACTIVE)
+  status           EnrollmentStatus  @default(ACTIVE)
   completionRate   Float            @default(0)  // 0 to 100 percent
 
   // Relations
@@ -128,6 +140,25 @@ enum EnrollmentStatus {
   ACTIVE
   COMPLETED
   DROPPED
+  EXPIRED
+}
+
+// ─────────────────────────────────────────
+// SAVED COURSES (Bookmarks)
+// ─────────────────────────────────────────
+
+model SavedCourse {
+  id        Int      @id @default(autoincrement())
+  studentId Int
+  courseId  Int
+  createdAt DateTime @default(now())
+
+  // RelationsFcours
+  student User   @relation("SavedCourses", fields: [studentId], references: [id], onDelete: Cascade)
+  course  Course @relation(fields: [courseId], references: [id], onDelete: Cascade)
+
+  @@unique([studentId, courseId])  // prevent duplicate bookmarks
+  @@map("saved_courses")
 }
 
 // ─────────────────────────────────────────

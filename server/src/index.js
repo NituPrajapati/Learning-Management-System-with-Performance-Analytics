@@ -3,8 +3,12 @@ import cors from "cors";
 import dotenv from "dotenv";
 import authRouter from "./routes/auth.js";
 import usersRouter from "./routes/users.js";
+import coursesRouter from "./routes/courses.js";
+import instructorRouter from "./routes/instructor.js";
+import studentRouter from "./routes/student.js";
 import { authMiddleware } from "./middleware/authMiddleware.js";
 import prisma from "./prisma.js";
+import morgan from "morgan"
 
 dotenv.config();
 
@@ -13,6 +17,7 @@ const app = express();
 const PORT = process.env.PORT || 5000;
 
 app.use(cors());
+app.use(morgan("dev"))
 app.use(express.json());
 
 // Health check
@@ -28,9 +33,12 @@ app.get("/api/health", async (req, res) => {
 
 app.use("/api/auth", authRouter);
 app.use("/api/users", usersRouter);
+app.use("/api/courses", coursesRouter);
+app.use("/api/instructor", instructorRouter);
+app.use("/api/student", studentRouter);
 
-// Back-compat alias (prefer GET /api/auth/me)
-app.get("/api/me", authMiddleware, async (req, res) => {
+// GET /api/auth/me - Get current logged in user (preferred endpoint)
+app.get("/api/auth/me", authMiddleware, async (req, res) => {
   return res.json({ user: req.user });
 });
 

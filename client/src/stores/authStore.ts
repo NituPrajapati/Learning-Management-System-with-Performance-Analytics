@@ -1,8 +1,10 @@
 import { create } from 'zustand'
+import { persist } from 'zustand/middleware'
 import type { AuthUser } from '../types/env'
+import api from '../api/axios'
+import { queryClient } from '../main' 
 
 export type Role = 'ADMIN' | 'INSTRUCTOR' | 'STUDENT'
-
 
 interface AuthState {
   user: AuthUser | null
@@ -12,77 +14,72 @@ interface AuthState {
   login: (email: string, password: string) => Promise<void>
   register: (name: string, email: string, password: string) => Promise<void>
   logout: () => void
+  clearError: () => void
 }
 
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000'
+export const useAuthStore = create<AuthState>()(
+  persist(
+    (set) => ({
+      user: null,
+      token: null,
+      isLoading: false,
+      error: null,
 
-export const useAuthStore = create<AuthState>((set) => ({
-  user: null,
-  token: null,
-  isLoading: false,
-  error: null,
+      login: async (email: string, password: string) => {
+        try {
+          set({ isLoading: true, error: null })
 
-  login: async (email: string, password: string) => {
-    try {
-      set({ isLoading: true, error: null })
-      const res = await fetch(`${API_BASE_URL}/api/auth/login`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ email, password }),
-      })
+          const res = await api.post('/api/auth/login', { email, password })
 
-      if (!res.ok) {
-        const data = await res.json().catch(() => ({}))
-        throw new Error(data.message || 'Failed to login')
-      }
+          set({
+            user: res.data.user,
+            token: res.data.token,
+            isLoading: false,
+            error: null,
+          })
+        } catch (err: unknown) {
+          set({
+            error: (err as { response?: { data?: { message?: string } } }).response?.data?.message || 'Failed to login',
+            isLoading: false,
+          })
+        }
+      },
 
-      const data = await res.json()
+      register: async (name: string, email: string, password: string) => {
+        try {
+          set({ isLoading: true, error: null })
 
-      set({
-        user: data.user,
-        token: data.token,
-        isLoading: false,
-        error: null,
-      })
-    } catch (err: any) {
-      set({ error: err.message || 'Failed to login', isLoading: false })
+          const res = await api.post('/api/auth/register', { name, email, password })
+
+          set({
+            user: res.data.user,
+            token: res.data.token,
+            isLoading: false,
+            error: null,
+          })
+        } catch (err: any) {
+          set({
+            error: err.response?.data?.message || 'Failed to register',
+            isLoading: false,
+          })
+        }
+      },
+
+      logout: () => {
+        queryClient.clear()
+        set({ user: null, token: null, error: null })
+      },
+
+      clearError: () => {
+        set({ error: null })
+      },
+    }),
+    {
+      name: 'auth-storage',
+      partialize: (state) => ({
+        user: state.user,
+        token: state.token,
+      }),
     }
-  },
-
-  register: async (name: string, email: string, password: string) => {
-    try {
-      set({ isLoading: true, error: null })
-      const res = await fetch(`${API_BASE_URL}/api/auth/register`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ name, email, password }),
-      })
-
-      if (!res.ok) {
-        const data = await res.json().catch(() => ({}))
-        throw new Error(data.message || 'Failed to register')
-      }
-
-      const data = await res.json()
-
-      set({
-        user: data.user,
-        token: data.token,
-        isLoading: false,
-        error: null,
-      })
-    } catch (err: any) {
-      set({ error: err.message || 'Failed to register', isLoading: false })
-    }
-  },
-
-  logout: () => {
-    set({ user: null, token: null, error: null })
-  },
-}))
-
-
+  )
+)
