@@ -24,7 +24,9 @@ export function Register() {
     await register(name, email, password)
   }
 
-  const passwordsMismatch = password && confirmPassword && password !== confirmPassword
+  const passwordsMismatch = Boolean(
+    password && confirmPassword && password !== confirmPassword
+  )
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-[#F4F3EE] text-[#141413] p-6">

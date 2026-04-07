@@ -25,6 +25,28 @@ export interface Course {
   updatedAt: string
 }
 
+export type ContentType = 'VIDEO' | 'PDF' | 'TEXT' | 'LINK'
+
+export interface Module {
+  id: number
+  title: string
+  description: string | null
+  orderIndex: number
+  contentType: ContentType
+  contentUrl: string | null
+  contentText: string | null
+  duration: number | null
+  isPublished: boolean
+  courseId: number
+  createdAt: string
+  updatedAt: string
+  quiz?: { id: number; title: string } | null
+}
+
+export interface CourseWithModules extends Course {
+  modules: Module[]
+}
+
 export interface Enrollment {
   id: number
   studentId: number
@@ -52,13 +74,17 @@ export const getCourses = async (): Promise<{ courses: Course[] }> => {
 }
 
 // Get single course detail
-export const getCourse = async (id: number): Promise<{ course: Course; isEnrolled: boolean; enrollment?: Enrollment }> => {
+export const getCourse = async (
+  id: number
+): Promise<{ course: CourseWithModules; isEnrolled: boolean; enrollment?: Enrollment }> => {
   const res = await api.get(`/api/courses/${id}`)
   return res.data
 }
 
-// Student: Enroll in course
-export const enrollInCourse = async (courseId: number): Promise<{ message: string; enrollment: Enrollment }> => {
+// Student: Enroll in course (200 + alreadyEnrolled if duplicate active enrollment; 201 on first enroll)
+export const enrollInCourse = async (
+  courseId: number
+): Promise<{ message: string; enrollment: Enrollment; alreadyEnrolled?: boolean }> => {
   const res = await api.post(`/api/courses/${courseId}/enroll`)
   return res.data
 }
@@ -136,6 +162,40 @@ export const toggleCoursePublish = async (
 // Admin: Get all courses
 export const getAllCourses = async (): Promise<{ courses: Course[] }> => {
   const res = await api.get('/api/users/courses')
+  return res.data
+}
+
+export const uploadInstructorVideo = async (video: File): Promise<{ url: string; publicId: string; size: number; format: string }> => {
+  const formData = new FormData()
+  formData.append('video', video)
+  const res = await api.post('/api/instructor/upload/video', formData, {
+    headers: { 'Content-Type': 'multipart/form-data' },
+  })
+  return res.data
+}
+
+export const uploadInstructorPdf = async (pdf: File): Promise<{ url: string; publicId: string; size: number }> => {
+  const formData = new FormData()
+  formData.append('pdf', pdf)
+  const res = await api.post('/api/instructor/upload/pdf', formData, {
+    headers: { 'Content-Type': 'multipart/form-data' },
+  })
+  return res.data
+}
+
+export const createCourseModule = async (
+  courseId: number,
+  data: {
+    title: string
+    description?: string
+    orderIndex?: number
+    contentType: ContentType
+    contentUrl?: string
+    contentText?: string
+    duration?: number
+  }
+): Promise<{ message: string; module: Module }> => {
+  const res = await api.post(`/api/instructor/courses/${courseId}/modules`, data)
   return res.data
 }
 

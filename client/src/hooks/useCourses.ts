@@ -5,7 +5,6 @@ import {
   getCourses,
   getCourse,
   enrollInCourse,
-  getMyEnrollments,
   getSavedCourses,
   saveCourse,
   unsaveCourse,
@@ -14,10 +13,12 @@ import {
   updateCourse,
   toggleCoursePublish,
   getAllCourses,
-  type Course,
-  type Enrollment,
-  type SavedCourse,
+  createCourseModule,
+  uploadInstructorPdf,
+  uploadInstructorVideo,
+  type ContentType,
 } from '../api/courses'
+import api from '../api/axios'
 
 // Public: Get all published courses
 export const useCourses = () => {
@@ -33,6 +34,42 @@ export const useCourse = (id: number | null) => {
     queryKey: ['course', id],
     queryFn: () => getCourse(id!),
     enabled: !!id,
+  })
+}
+
+export const useUploadInstructorVideo = () => {
+  return useMutation({
+    mutationFn: uploadInstructorVideo,
+  })
+}
+
+export const useUploadInstructorPdf = () => {
+  return useMutation({
+    mutationFn: uploadInstructorPdf,
+  })
+}
+
+export const useCreateCourseModule = () => {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: ({
+      courseId,
+      data,
+    }: {
+      courseId: number
+      data: {
+        title: string
+        description?: string
+        orderIndex?: number
+        contentType: ContentType
+        contentUrl?: string
+        contentText?: string
+        duration?: number
+      }
+    }) => createCourseModule(courseId, data),
+    onSuccess: (_res, variables) => {
+      queryClient.invalidateQueries({ queryKey: ['course', variables.courseId] })
+    },
   })
 }
 
@@ -53,8 +90,11 @@ export const useEnrollCourse = () => {
 export const useEnrollments = () => {
   const { user } = useAuthStore()
   return useQuery({
-    queryKey: ['enrollments', user?.id], 
-    queryFn: getMyEnrollments,
+    queryKey: ['enrollments', user?.id],
+    queryFn: async () => {
+      const res = await api.get('/api/student/me/enrollments')
+      return res.data
+    },
     enabled: !!user && user.role === 'STUDENT'
   })
 }

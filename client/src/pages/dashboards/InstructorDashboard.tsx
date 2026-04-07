@@ -1,9 +1,9 @@
 import { useState } from 'react'
 import { Navbar } from '../../components/common/Navbar'
+import { Link } from 'react-router-dom'
 import {
   useInstructorCourses,
   useCreateCourse,
-  useUpdateCourse,
   useToggleCoursePublish,
 } from '../../hooks/useCourses'
 import { LoadingSpinner } from '../../components/common/LoadingSpinner'
@@ -38,45 +38,45 @@ function CreateCourseForm({ onClose }: { onClose: () => void }) {
   return (
     <form onSubmit={handleSubmit} className="space-y-4">
       <div>
-        <label className="block text-sm font-medium text-[#141413] mb-1">Course Title *</label>
+        <label className="block text-sm font-medium text-[#111827] mb-1">Course Title *</label>
         <input
           type="text"
           value={formData.title}
           onChange={(e) => setFormData({ ...formData, title: e.target.value })}
-          className="w-full rounded-md border border-[#D4D2CC] px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-[#08A696] bg-white"
+          className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-[#08A696] bg-white"
           required
         />
       </div>
 
       <div>
-        <label className="block text-sm font-medium text-[#141413] mb-1">Description *</label>
+        <label className="block text-sm font-medium text-[#111827] mb-1">Description *</label>
         <textarea
           value={formData.description}
           onChange={(e) => setFormData({ ...formData, description: e.target.value })}
           rows={4}
-          className="w-full rounded-md border border-[#D4D2CC] px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-[#08A696] bg-white"
+          className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-[#08A696] bg-white"
           required
         />
       </div>
 
       <div className="grid grid-cols-2 gap-4">
         <div>
-          <label className="block text-sm font-medium text-[#141413] mb-1">Duration (weeks)</label>
+          <label className="block text-sm font-medium text-[#111827] mb-1">Duration (weeks)</label>
           <input
             type="number"
             value={formData.durationWeeks}
             onChange={(e) => setFormData({ ...formData, durationWeeks: e.target.value })}
-            className="w-full rounded-md border border-[#D4D2CC] px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-[#08A696] bg-white"
+            className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-[#08A696] bg-white"
             min="1"
           />
         </div>
 
         <div>
-          <label className="block text-sm font-medium text-[#141413] mb-1">Course Type</label>
+          <label className="block text-sm font-medium text-[#111827] mb-1">Course Type</label>
           <select
             value={formData.courseType}
             onChange={(e) => setFormData({ ...formData, courseType: e.target.value as 'FREE' | 'PAID', price: formData.courseType === 'PAID' ? formData.price : '' })}
-            className="w-full rounded-md border border-[#D4D2CC] px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-[#08A696] bg-white"
+            className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-[#08A696] bg-white"
           >
             <option value="FREE">FREE</option>
             <option value="PAID">PAID</option>
@@ -86,12 +86,12 @@ function CreateCourseForm({ onClose }: { onClose: () => void }) {
 
       {formData.courseType === 'PAID' && (
         <div>
-          <label className="block text-sm font-medium text-[#141413] mb-1">Price ($) *</label>
+          <label className="block text-sm font-medium text-[#111827] mb-1">Price ($) *</label>
           <input
             type="number"
             value={formData.price}
             onChange={(e) => setFormData({ ...formData, price: e.target.value })}
-            className="w-full rounded-md border border-[#D4D2CC] px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-[#08A696] bg-white"
+            className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-[#08A696] bg-white"
             min="0.01"
             step="0.01"
             required={formData.courseType === 'PAID'}
@@ -101,13 +101,13 @@ function CreateCourseForm({ onClose }: { onClose: () => void }) {
       )}
 
       <div>
-        <label className="block text-sm font-medium text-[#141413] mb-1">Level</label>
+        <label className="block text-sm font-medium text-[#111827] mb-1">Level</label>
         <select
           value={formData.level}
           onChange={(e) =>
             setFormData({ ...formData, level: e.target.value as 'BEGINNER' | 'INTERMEDIATE' | 'ADVANCED' })
           }
-          className="w-full rounded-md border border-[#D4D2CC] px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-[#08A696] bg-white"
+          className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-[#08A696] bg-white"
         >
           <option value="BEGINNER">BEGINNER</option>
           <option value="INTERMEDIATE">INTERMEDIATE</option>
@@ -116,12 +116,12 @@ function CreateCourseForm({ onClose }: { onClose: () => void }) {
       </div>
 
       <div>
-        <label className="block text-sm font-medium text-[#141413] mb-1">Thumbnail URL</label>
+        <label className="block text-sm font-medium text-[#111827] mb-1">Thumbnail URL</label>
         <input
           type="url"
           value={formData.thumbnail}
           onChange={(e) => setFormData({ ...formData, thumbnail: e.target.value })}
-          className="w-full rounded-md border border-[#D4D2CC] px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-[#08A696] bg-white"
+          className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-[#08A696] bg-white"
         />
       </div>
 
@@ -136,7 +136,7 @@ function CreateCourseForm({ onClose }: { onClose: () => void }) {
         <button
           type="button"
           onClick={onClose}
-          className="px-4 py-2 rounded-md border border-[#D4D2CC] bg-white text-[#141413] hover:bg-[#F4F3EE] transition"
+          className="px-4 py-2 rounded-md border border-gray-300 bg-white text-[#111827] hover:bg-[#F2F4F7] transition"
         >
           Cancel
         </button>
@@ -153,14 +153,14 @@ function CourseCard({ course }: { course: Course }) {
   }
 
   return (
-    <div className="bg-white rounded-lg shadow-sm border border-[#E0DED8] p-5">
-      <div className="flex items-start justify-between mb-3">
-        <div className="flex-1">
-          <h3 className="text-lg font-semibold text-[#141413] mb-1">{course.title}</h3>
-          <p className="text-sm text-[#6B6A66] line-clamp-2">{course.description}</p>
+    <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-3">
+      <div className="flex items-start justify-between mb-2 gap-2">
+        <div className="flex-1 min-w-0">
+          <h3 className="text-sm font-semibold text-[#111827] mb-1 line-clamp-2">{course.title}</h3>
+          <p className="text-xs text-gray-600 line-clamp-2">{course.description}</p>
         </div>
         <span
-          className={`px-2 py-1 rounded-full text-xs font-medium ${
+          className={`px-1.5 py-0.5 rounded-full text-[10px] font-medium shrink-0 ${
             course.isPublished
               ? 'bg-green-100 text-green-700'
               : 'bg-gray-100 text-gray-700'
@@ -170,12 +170,12 @@ function CourseCard({ course }: { course: Course }) {
         </span>
       </div>
 
-      <div className="flex items-center gap-2 mb-4 flex-wrap">
-        <span className="text-xs text-[#6B6A66]">
+      <div className="flex items-center gap-2 mb-3 flex-wrap">
+        <span className="text-[10px] text-gray-600">
           {course._count?.modules || 0} modules • {course._count?.enrollments || 0} enrollments
         </span>
         {course.durationWeeks && (
-          <span className="text-xs text-[#6B6A66]">• {course.durationWeeks} weeks</span>
+          <span className="text-xs text-gray-600">• {course.durationWeeks} weeks</span>
         )}
         {course.price && (
           <span className="text-xs font-semibold text-[#08A696]">• ${course.price.toFixed(2)}</span>
@@ -198,12 +198,15 @@ function CourseCard({ course }: { course: Course }) {
               ? 'Unpublish'
               : 'Publish'}
         </button>
-        <button className="px-3 py-1 rounded-md border border-[#D4D2CC] bg-white text-[#141413] hover:bg-[#F4F3EE] transition text-sm">
+        <button className="px-3 py-1 rounded-md border border-gray-300 bg-white text-[#111827] hover:bg-[#F2F4F7] transition text-sm">
           Edit
         </button>
-        <button className="px-3 py-1 rounded-md border border-[#D4D2CC] bg-white text-[#141413] hover:bg-[#F4F3EE] transition text-sm">
+        <Link
+          to={`/instructor/courses/${course.id}`}
+          className="px-3 py-1 rounded-md border border-gray-300 bg-white text-[#111827] hover:bg-[#F2F4F7] transition text-sm"
+        >
           Modules
-        </button>
+        </Link>
       </div>
     </div>
   )
@@ -214,14 +217,14 @@ export function InstructorDashboard() {
   const { data, isLoading, error } = useInstructorCourses()
 
   return (
-    <div className="min-h-screen bg-[#F4F3EE] text-[#141413]">
+    <div className="min-h-full text-[#111827]">
       <Navbar title="Instructor Dashboard" />
-      <main className="p-6">
-        <div className="max-w-6xl mx-auto">
+      <main className="p-3 sm:p-6 bg-[#F2F4F7]">
+        <div className="max-w-6xl mx-auto px-[3px]">
           <div className="flex items-center justify-between mb-6">
             <div>
-              <h2 className="text-2xl font-bold text-[#141413] mb-1">My Courses</h2>
-              <p className="text-sm text-[#6B6A66]">Create and manage your courses</p>
+              <h2 className="text-2xl font-bold text-[#111827] mb-1">My Courses</h2>
+              <p className="text-sm text-gray-600">Create and manage your courses</p>
             </div>
             <button
               onClick={() => setShowCreateForm(true)}
@@ -232,8 +235,8 @@ export function InstructorDashboard() {
           </div>
 
           {showCreateForm && (
-            <div className="bg-white rounded-lg shadow-sm border border-[#E0DED8] p-6 mb-6">
-              <h3 className="text-lg font-semibold text-[#141413] mb-4">Create New Course</h3>
+            <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6 mb-6">
+              <h3 className="text-lg font-semibold text-[#111827] mb-4">Create New Course</h3>
               <CreateCourseForm onClose={() => setShowCreateForm(false)} />
             </div>
           )}
@@ -245,14 +248,17 @@ export function InstructorDashboard() {
               Failed to load courses. Please try again later.
             </div>
           ) : data?.courses && data.courses.length > 0 ? (
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div
+              className="grid grid-cols-1 md:grid-cols-2 gap-[3px]"
+              onContextMenu={(e) => e.preventDefault()}
+            >
               {data.courses.map((course) => (
                 <CourseCard key={course.id} course={course} />
               ))}
             </div>
           ) : (
-            <div className="bg-white rounded-lg shadow-sm border border-[#E0DED8] p-8 text-center">
-              <p className="text-[#6B6A66] mb-4">You haven't created any courses yet.</p>
+            <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-8 text-center">
+              <p className="text-gray-600 mb-4">You haven't created any courses yet.</p>
               <button
                 onClick={() => setShowCreateForm(true)}
                 className="px-4 py-2 rounded-md bg-[#08A696] text-white font-medium hover:bg-[#078878] transition"

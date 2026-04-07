@@ -1,8 +1,15 @@
 import { Link } from 'react-router-dom'
 import { useAuthStore } from '../stores/authStore'
-import { useCourses, useEnrollCourse, useSaveCourse, useUnsaveCourse, useSavedCourses } from '../hooks/useCourses'
+import {
+  useCourses,
+  useEnrollCourse,
+  useEnrollments,
+  useSaveCourse,
+  useUnsaveCourse,
+  useSavedCourses,
+} from '../hooks/useCourses'
 import { LoadingSpinner } from '../components/common/LoadingSpinner'
-import type { Course } from '../api/courses'
+import type { Course, Enrollment } from '../api/courses'
 
 function CourseCard({ course }: { course: Course }) {
   const { user } = useAuthStore()
@@ -10,14 +17,28 @@ function CourseCard({ course }: { course: Course }) {
   const saveMutation = useSaveCourse()
   const unsaveMutation = useUnsaveCourse()
   const { data: savedData } = useSavedCourses()
+  const { data: enrollmentsData, isLoading: enrollmentsLoading } = useEnrollments()
 
   const isSaved = savedData?.savedCourses?.some((sc) => sc.courseId === course.id) || false
+
+  const isStudent = user?.role === 'STUDENT'
+  const enrollmentForCourse = enrollmentsData?.enrollments?.find(
+    (e: Enrollment) => e.courseId === course.id
+  )
+  const isAlreadyEnrolled =
+    isStudent &&
+    !!enrollmentForCourse &&
+    !enrollmentForCourse.isExpired &&
+    enrollmentForCourse.status !== 'EXPIRED' &&
+    enrollmentForCourse.status !== 'DROPPED' &&
+    (enrollmentForCourse.status === 'ACTIVE' || enrollmentForCourse.status === 'COMPLETED')
 
   const handleEnroll = () => {
     if (!user) {
       window.location.href = '/login?redirect=/'
       return
     }
+    if (!isStudent || isAlreadyEnrolled) return
     enrollMutation.mutate(course.id)
   }
 
@@ -26,12 +47,15 @@ function CourseCard({ course }: { course: Course }) {
       window.location.href = '/login?redirect=/'
       return
     }
+    if (!isStudent) return
     if (isSaved) {
       unsaveMutation.mutate(course.id)
     } else {
       saveMutation.mutate(course.id)
     }
   }
+
+  const showBookmark = !user || isStudent
 
   return (
     <div className="bg-white rounded-lg shadow-sm border border-[#E0DED8] overflow-hidden hover:shadow-md transition">
@@ -48,29 +72,48 @@ function CourseCard({ course }: { course: Course }) {
       <div className="p-5">
         <div className="flex items-start justify-between mb-2">
           <h3 className="text-lg font-semibold text-[#141413] line-clamp-2">{course.title}</h3>
-          <button
-            onClick={handleSave}
-            className={`ml-2 p-2 rounded-full transition ${
-              isSaved
-                ? 'text-[#08A696] bg-[#E6FAF7]'
-                : 'text-[#6B6A66] hover:bg-[#F4F3EE]'
-            }`}
-            title={isSaved ? 'Unsave course' : 'Save course'}
-          >
-            <svg
-              className="w-5 h-5"
-              fill={isSaved ? 'currentColor' : 'none'}
-              stroke="currentColor"
-              viewBox="0 0 24 24"
+          {showBookmark ? (
+            <button
+              type="button"
+              onClick={handleSave}
+              disabled={saveMutation.isPending || unsaveMutation.isPending}
+              className={`ml-2 p-2 rounded-full transition shrink-0 ${
+                isSaved
+                  ? 'text-[#08A696] bg-[#E6FAF7]'
+                  : 'text-[#6B6A66] hover:bg-[#F4F3EE]'
+              } disabled:opacity-50`}
+              title={isSaved ? 'Remove from saved' : 'Save course'}
             >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M5 5a2 2 0 012-2h10a2 2 0 012 2v16l-7-3.5L5 21V5z"
-              />
-            </svg>
-          </button>
+              <svg
+                className="w-5 h-5"
+                fill={isSaved ? 'currentColor' : 'none'}
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M5 5a2 2 0 012-2h10a2 2 0 012 2v16l-7-3.5L5 21V5z"
+                />
+              </svg>
+            </button>
+          ) : (
+            <span
+              className="ml-2 p-2 rounded-full text-[#D4D2CC] cursor-default shrink-0"
+              title="Bookmarks are only available for students"
+              aria-hidden
+            >
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M5 5a2 2 0 012-2h10a2 2 0 012 2v16l-7-3.5L5 21V5z"
+                />
+              </svg>
+            </span>
+          )}
         </div>
 
         <p className="text-sm text-[#6B6A66] mb-3 line-clamp-2">{course.description}</p>
@@ -108,13 +151,52 @@ function CourseCard({ course }: { course: Course }) {
           </span>
         </div>
 
-        <button
-          onClick={handleEnroll}
-          disabled={enrollMutation.isPending}
-          className="w-full px-4 py-2 rounded-md bg-[#08A696] text-white font-medium hover:bg-[#078878] transition disabled:opacity-60 disabled:cursor-not-allowed"
-        >
-          {enrollMutation.isPending ? 'Enrolling...' : 'Enroll Now'}
-        </button>
+        {!user ? (
+          <button
+            type="button"
+            onClick={handleEnroll}
+            className="w-full px-4 py-2 rounded-md bg-[#08A696] text-white font-medium hover:bg-[#078878] transition"
+          >
+            Enroll Now
+          </button>
+        ) : !isStudent ? (
+          <button
+            type="button"
+            disabled
+            className="w-full px-4 py-2 rounded-md bg-[#E0DED8] text-[#6B6A66] font-medium cursor-not-allowed"
+          >
+            Enrolling is for students
+          </button>
+        ) : isAlreadyEnrolled ? (
+          <div className="space-y-2">
+            <button
+              type="button"
+              disabled
+              className="w-full px-4 py-2 rounded-md bg-[#E0DED8] text-[#6B6A66] font-medium cursor-not-allowed"
+            >
+              Already enrolled
+            </button>
+            <Link
+              to={`/student/courses/${course.id}`}
+              className="block w-full text-center px-4 py-2 rounded-md border border-[#08A696] text-[#08A696] font-medium hover:bg-[#E6FAF7] transition text-sm"
+            >
+              Go to course
+            </Link>
+          </div>
+        ) : (
+          <button
+            type="button"
+            onClick={handleEnroll}
+            disabled={enrollMutation.isPending || enrollmentsLoading}
+            className="w-full px-4 py-2 rounded-md bg-[#08A696] text-white font-medium hover:bg-[#078878] transition disabled:opacity-60 disabled:cursor-not-allowed"
+          >
+            {enrollmentsLoading
+              ? 'Loading...'
+              : enrollMutation.isPending
+                ? 'Enrolling...'
+                : 'Enroll Now'}
+          </button>
+        )}
       </div>
     </div>
   )

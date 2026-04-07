@@ -4,7 +4,7 @@ export function Navbar({ title }: { title: string }) {
   const { user, logout } = useAuthStore()
 
   return (
-    <header className="flex items-center justify-between px-6 py-4 bg-[#141413] text-[#F4F3EE] shadow-sm">
+    <header className="flex items-center justify-between px-6 py-4 bg-[#111827] text-white shadow-sm">
       <h1 className="text-xl font-semibold">{title}</h1>
       <div className="flex items-center gap-3 text-sm">
         {user && (
@@ -13,8 +13,9 @@ export function Navbar({ title }: { title: string }) {
               {user.name} ({user.role})
             </span>
             <button
+              type="button"
               onClick={logout}
-              className="px-3 py-1 rounded bg-[#08A696] text-[#141413] font-medium hover:opacity-90 transition"
+              className="px-3 py-1.5 rounded-md border border-white/30 bg-transparent text-white font-medium hover:bg-white/10 transition"
             >
               Logout
             </button>
@@ -24,5 +25,3 @@ export function Navbar({ title }: { title: string }) {
     </header>
   )
 }
-
-

@@ -1,7 +1,9 @@
 import express from "express";
 import { protect, allowRoles } from "../middleware/authMiddleware.js";
 import prisma from "../prisma.js";
-import { uploadVideo, uploadPDF } from '../config/cloudinary.js'
+import { notifyCourseStudents } from "../utils/notify.js";
+import { uploadVideo, uploadPDF, uploadToCloudinary } from '../config/cloudinary.js'
+
 
 const router = express.Router();
 
@@ -217,9 +219,20 @@ router.post("/courses/:id/modules", async (req, res) => {
         contentText: contentText || null,
         duration: duration ? parseInt(duration) : null,
         courseId,
-        isPublished: false,
+        // Visible to enrolled students as soon as the course is published
+        isPublished: true,
       },
     });
+
+    if (course.isPublished) {
+      await notifyCourseStudents({
+        courseId,
+        title: "New module uploaded",
+        message: `A new module "${title}" was added to "${course.title}". Happy learning!`,
+        type: "NEW_MODULE",
+        moduleId: module.id,
+      });
+    }
 
     return res.status(201).json({
       message: "Module added successfully",
@@ -328,13 +341,24 @@ router.post('/upload/video',
       if (!req.file) {
         return res.status(400).json({ message: 'No video file uploaded' })
       }
+      console.log('File received:', req.file.size, 'bytes') // ← add
+      console.log('Cloudinary config:', {                    // ← add
+        cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
+        api_key: process.env.CLOUDINARY_API_KEY ? 'exists' : 'MISSING',
+        api_secret: process.env.CLOUDINARY_API_SECRET ? 'exists' : 'MISSING'
+      })
+      // Upload buffer to cloudinary
+      const result = await uploadToCloudinary(req.file.buffer, {
+        folder:        'lms/videos',
+        resource_type: 'video',
+        transformation: [{ quality: 'auto' }]
+      })
 
       return res.status(201).json({
-        url:          req.file.path,
-        publicId:     req.file.filename,
-        originalName: req.file.originalname,
-        size:         req.file.size,
-        format:       req.file.format || 'mp4'
+        url:      result.secure_url,
+        publicId: result.public_id,
+        size:     result.bytes,
+        format:   result.format
       })
     } catch (error) {
       console.error('Video upload error:', error)
@@ -343,20 +367,24 @@ router.post('/upload/video',
   }
 )
 
-// POST /api/instructor/upload/pdf
 router.post('/upload/pdf',
   uploadPDF.single('pdf'),
   async (req, res) => {
     try {
       if (!req.file) {
-        return res.status(400).json({ message: 'No PDF file uploaded' })
+        return res.status(400).json({ message: 'No PDF uploaded' })
       }
 
+      const result = await uploadToCloudinary(req.file.buffer, {
+        folder:        'lms/pdfs',
+        resource_type: 'raw',
+        format:        'pdf'
+      })
+
       return res.status(201).json({
-        url:          req.file.path,
-        publicId:     req.file.filename,
-        originalName: req.file.originalname,
-        size:         req.file.size
+        url:      result.secure_url,
+        publicId: result.public_id,
+        size:     result.bytes
       })
     } catch (error) {
       console.error('PDF upload error:', error)

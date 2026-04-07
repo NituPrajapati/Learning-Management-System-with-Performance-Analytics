@@ -33,7 +33,7 @@ export interface User {
 export interface NavItem {
   label: string
   path: string
-  icon: string
+  icon: import('react').ReactNode
 }
 
 // ─────────────────────────────────────────

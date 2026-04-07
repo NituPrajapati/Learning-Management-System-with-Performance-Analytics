@@ -1,6 +1,7 @@
 import express from "express";
 import prisma from "../prisma.js";
 import { protect, allowRoles } from "../middleware/authMiddleware.js";
+import { notifyUser } from "../utils/notify.js";
 
 const router = express.Router();
 
@@ -82,14 +83,6 @@ router.get("/:id", protect, async (req, res) => {
             email: true,
           },
         },
-        modules: {
-          where: {
-            isPublished: true,
-          },
-          orderBy: {
-            orderIndex: "asc",
-          },
-        },
       },
     });
 
@@ -112,22 +105,40 @@ router.get("/:id", protect, async (req, res) => {
       isEnrolled = !!enrollment && enrollment.status === "ACTIVE";
     }
 
-    // Only show course if published OR user is enrolled
-    if (!course.isPublished && !isEnrolled) {
+    const isOwnerInstructor =
+      req.user &&
+      req.user.role === "INSTRUCTOR" &&
+      course.instructorId === req.user.id;
+
+    // Published OR enrolled student OR owning instructor (draft editing)
+    if (!course.isPublished && !isEnrolled && !isOwnerInstructor) {
       return res.status(403).json({ message: "Course not available" });
     }
+
+    const modules = await prisma.module.findMany({
+      where: {
+        courseId,
+        ...(isOwnerInstructor ? {} : { isPublished: true }),
+      },
+      orderBy: { orderIndex: "asc" },
+      include: {
+        quiz: { select: { id: true, title: true } },
+      },
+    });
+
+    const courseWithModules = { ...course, modules };
 
     // Check if enrollment expired
     if (enrollment && enrollment.expiresAt && new Date(enrollment.expiresAt) < new Date()) {
       return res.json({
-        course,
+        course: courseWithModules,
         isEnrolled: false,
         enrollmentExpired: true,
       });
     }
 
     return res.json({
-      course,
+      course: courseWithModules,
       isEnrolled,
       enrollment,
     });
@@ -161,6 +172,33 @@ router.post("/:id/enroll", protect, allowRoles('STUDENT'), async (req, res) => {
       return res.status(400).json({ message: "Course is not available for enrollment" });
     }
 
+    const enrollmentCourseSelect = {
+      id: true,
+      title: true,
+      description: true,
+      thumbnail: true,
+      durationWeeks: true,
+      courseType: true,
+      level: true,
+      price: true,
+      isPublished: true,
+      instructorId: true,
+      createdAt: true,
+      updatedAt: true,
+      instructor: {
+        select: {
+          name: true,
+        },
+      },
+    };
+
+    const calcExpiresAt = () => {
+      if (!course.durationWeeks) return null;
+      const d = new Date();
+      d.setDate(d.getDate() + course.durationWeeks * 7);
+      return d;
+    };
+
     // Check if already enrolled
     const existing = await prisma.enrollment.findUnique({
       where: {
@@ -172,15 +210,68 @@ router.post("/:id/enroll", protect, allowRoles('STUDENT'), async (req, res) => {
     });
 
     if (existing) {
-      return res.status(409).json({ message: "Already enrolled in this course" });
+      // Idempotent: active or completed — no error, same shape as success
+      if (existing.status === "ACTIVE" || existing.status === "COMPLETED") {
+        const enrollment = await prisma.enrollment.findUnique({
+          where: {
+            studentId_courseId: { studentId, courseId },
+          },
+          include: {
+            course: { select: enrollmentCourseSelect },
+          },
+        });
+        return res.status(200).json({
+          message: "Already enrolled in this course",
+          alreadyEnrolled: true,
+          enrollment,
+        });
+      }
+
+      // Dropped: allow enrolling again
+      if (existing.status === "DROPPED") {
+        const expiresAt = calcExpiresAt();
+        const enrollment = await prisma.enrollment.update({
+          where: {
+            studentId_courseId: { studentId, courseId },
+          },
+          data: {
+            status: "ACTIVE",
+            enrolledAt: new Date(),
+            expiresAt,
+            completedAt: null,
+            completionRate: 0,
+          },
+          include: {
+            course: { select: enrollmentCourseSelect },
+          },
+        });
+        await notifyUser({
+          userId: studentId,
+          title: `Welcome back to ${enrollment.course.title}`,
+          message: `You're re-enrolled in "${enrollment.course.title}". Happy learning!`,
+          type: "ENROLLMENT",
+          courseId,
+          enrollmentId: enrollment.id,
+        });
+
+        return res.status(200).json({
+          message: "Successfully re-enrolled in course",
+          enrollment,
+        });
+      }
+
+      // Expired (or other non-active states): explicit conflict
+      return res.status(409).json({
+        code: "ENROLLMENT_NOT_AVAILABLE",
+        message:
+          existing.status === "EXPIRED"
+            ? "Your enrollment in this course has expired."
+            : "You cannot enroll in this course in your current enrollment state.",
+      });
     }
 
-    // Calculate expiration date (durationWeeks * 7 days)
-    let expiresAt = null;
-    if (course.durationWeeks) {
-      expiresAt = new Date();
-      expiresAt.setDate(expiresAt.getDate() + course.durationWeeks * 7);
-    }
+    const expiresAt = calcExpiresAt();
+
     // Create enrollment
     const enrollment = await prisma.enrollment.create({
       data: {
@@ -191,27 +282,18 @@ router.post("/:id/enroll", protect, allowRoles('STUDENT'), async (req, res) => {
       },
       include: {
         course: {
-          select: {
-            id: true,
-            title: true,
-            description: true,
-            thumbnail: true,
-            durationWeeks: true,
-            courseType: true,
-            level: true,
-            price: true,
-            isPublished: true,
-            instructorId: true,
-            createdAt: true,
-            updatedAt: true,
-            instructor: {
-              select: {
-                name: true,
-              },
-            },
-          },
+          select: enrollmentCourseSelect,
         },
       },
+    });
+
+    await notifyUser({
+      userId: studentId,
+      title: `Welcome to ${course.title}`,
+      message: `You're enrolled in "${course.title}". Happy learning!`,
+      type: "ENROLLMENT",
+      courseId,
+      enrollmentId: enrollment.id,
     });
 
     return res.status(201).json({

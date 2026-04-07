@@ -1,12 +1,12 @@
 generator client {
   provider = "prisma-client-js"
-  //output   = "../generated/prisma"
 }
 
 datasource db {
   provider = "mysql"
   url      = env("DATABASE_URL")
 }
+
 
 // ─────────────────────────────────────────
 // USERS & ROLES
@@ -16,6 +16,7 @@ model User {
   id            Int      @id @default(autoincrement())
   name          String
   email         String   @unique
+  streak        Int      @default(0)
   password      String
   role          Role     @default(STUDENT)
   profileImage  String?
@@ -24,20 +25,105 @@ model User {
   updatedAt     DateTime @updatedAt
 
   // Relations
-  taughtCourses    Course[]        @relation("InstructorCourses")
-  enrollments      Enrollment[]
-  savedCourses     SavedCourse[]   @relation("SavedCourses")
-  quizAttempts     QuizAttempt[]
-  activityLogs     ActivityLog[]
-  moduleProgress   ModuleProgress[]
+  taughtCourses      Course[]        @relation("InstructorCourses")
+  enrollments        Enrollment[]
+  savedCourses       SavedCourse[]   @relation("SavedCourses")
+  quizAttempts       QuizAttempt[]
+  activityLogs       ActivityLog[]
+  moduleProgress     ModuleProgress[]
+  notifications      Notification[]
+  studentProgresses  StudentProgress[]   // 🔹 opposite relation
+  chatMessages       ChatMessage[]       // 🔹 opposite relation
+  chatEngagements    ChatEngagement[] 
 
   @@map("users")
+}
+
+// ─────────────────────────────────────────
+// STUDENT PROGRESS (daily streak, etc.)
+// ─────────────────────────────────────────
+
+model StudentProgress {
+  id                  Int       @id @default(autoincrement())
+  studentId           Int       @unique
+  streak              Int       @default(0)
+  chatEngagementScore Int      @default(0)
+  lastVisit           DateTime?
+  createdAt           DateTime  @default(now())
+  updatedAt           DateTime  @updatedAt
+
+  student User @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  @@index([studentId])
+
+  @@map("student_progress")
+
 }
 
 enum Role {
   ADMIN
   INSTRUCTOR
   STUDENT
+}
+
+// ─────────────────────────────────────────
+// Chat
+// _________________________________________
+
+model ChatMessage {
+  id        Int      @id @default(autoincrement())
+  courseId  Int
+  senderId  Int
+  message   String   @db.Text
+  replyToMessageId Int?
+  isEdited  Boolean  @default(false)
+  createdAt DateTime @default(now())
+
+  course Course @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  sender User   @relation(fields: [senderId], references: [id], onDelete: Cascade)
+  replyTo ChatMessage? @relation("ChatReplyThread", fields: [replyToMessageId], references: [id], onDelete: SetNull)
+  replies ChatMessage[] @relation("ChatReplyThread")
+
+  @@index([courseId])
+  @@index([senderId])
+  @@index([replyToMessageId])
+  @@index([createdAt])
+  @@map("chat_messages")
+}
+
+// ─────────────────────────────────────────
+// CHAT ENGAGEMENT
+// ─────────────────────────────────────────
+model ChatEngagement {
+  id            Int      @id @default(autoincrement())
+  studentId     Int
+  courseId      Int
+
+  // 🔹 Total engagement score for this course
+  score         Int      @default(0)
+
+  // 🔹 Timestamp of last score update (for cooldown)
+  lastScoreAt   DateTime?
+
+  // 🔹 Optional: track last message timestamp
+  lastMessageAt DateTime?
+
+  // 🔹 Audit timestamps
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  // 🔹 Relations
+  student User   @relation(fields: [studentId], references: [id])
+  course  Course @relation(fields: [courseId], references: [id])
+
+  // 🔹 Ensure one record per student per course
+  @@unique([studentId, courseId])
+
+  // 🔹 Indexes for fast queries
+  @@index([courseId])
+  @@index([studentId])
+
+  // 🔹 Map to a clean DB table name
+  @@map("chat_engagement")
 }
 
 // ─────────────────────────────────────────
@@ -65,6 +151,9 @@ model Course {
   enrollments  Enrollment[]
   savedCourses SavedCourse[]
   activityLogs ActivityLog[]
+  notifications Notification[]
+  chatMessages       ChatMessage[]       // 🔹 opposite relation
+  chatEngagements    ChatEngagement[] 
 
   @@map("courses")
 }
@@ -97,6 +186,9 @@ model Module {
   courseId     Int
   createdAt    DateTime     @default(now())
   updatedAt    DateTime     @updatedAt
+  publicId     String?     // Cloudinary public ID (for deletion)
+  fileSize     Int?        // file size in bytes
+  isFree       Boolean     @default(false) // preview module
 
   // Relations
   course         Course           @relation(fields: [courseId], references: [id], onDelete: Cascade)
@@ -127,10 +219,14 @@ model Enrollment {
   completedAt      DateTime?
   status           EnrollmentStatus  @default(ACTIVE)
   completionRate   Float            @default(0)  // 0 to 100 percent
+  lastAccessedAt   DateTime?        // last time student opened course
+  totalTimeSpent   Int      @default(0) // total seconds spent
+  quizAvgScore     Float?            // average quiz score
 
   // Relations
   student  User    @relation(fields: [studentId], references: [id])
   course   Course  @relation(fields: [courseId], references: [id])
+  notifications Notification[] 
 
   @@unique([studentId, courseId])  // prevent double enrollment
   @@map("enrollments")
@@ -251,6 +347,7 @@ model QuizAttempt {
   attemptNumber Int       @default(1)
   startedAt     DateTime  @default(now())
   submittedAt   DateTime?
+  timeTakenSec  Int?      // client measured (seconds)
   answers       Json      // store answers as JSON: [{questionId, selectedOptionId}]
 
   // Relations
@@ -293,4 +390,34 @@ enum ActivityType {
   QUIZ_STARTED
   QUIZ_SUBMITTED
   CONTENT_VIEWED
+}
+
+model Notification {
+  id           Int              @id @default(autoincrement())
+  userId       Int
+  title        String
+  message      String           @db.Text
+  type         NotificationType @default(INFO)
+  isRead       Boolean          @default(false)
+  courseId     Int?
+  moduleId     Int?
+  enrollmentId Int? 
+  createdAt    DateTime         @default(now())
+
+  user   User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  course Course? @relation(fields: [courseId], references: [id])
+  enrollment Enrollment? @relation(fields: [enrollmentId], references: [id])
+
+  @@index([userId])
+  @@map("notifications")
+}
+
+enum NotificationType {
+  INFO
+  NEW_MODULE
+  COURSE_UPDATE
+  EXAM_REMINDER
+  ENROLLMENT
+  QUIZ_RESULT
+  COURSE_EXPIRING
 }
