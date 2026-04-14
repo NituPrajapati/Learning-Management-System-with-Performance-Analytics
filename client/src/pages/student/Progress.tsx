@@ -2,6 +2,7 @@ import {
     LineChart, Line, XAxis, YAxis,
     CartesianGrid, Tooltip, ResponsiveContainer
   } from 'recharts'
+  import { Link } from 'react-router-dom'
   import { FaFire } from 'react-icons/fa6'
   import { useStudentAnalytics } from '../../hooks/useAnalytics'
   import { useStudentDailyVisit } from '../../hooks/useStudentDailyVisit'
@@ -26,7 +27,15 @@ import {
   
     return (
       <div className="space-y-6 m-[3px]">
-        <h1 className="text-xl font-bold text-[#111827]">My Progress</h1>
+        <div className="flex items-center justify-between gap-3">
+          <h1 className="text-xl font-bold text-[#111827]">My Progress</h1>
+          <Link
+            to="/student/report"
+            className="rounded-md bg-[#08A698] px-3 py-2 text-xs font-medium text-white hover:opacity-90"
+          >
+            See report
+          </Link>
+        </div>
 
         <div className="rounded-xl border border-orange-200 bg-gradient-to-br from-orange-50 to-amber-50 p-4 flex items-center gap-4">
           <div className="w-12 h-12 rounded-full bg-white border border-orange-200 flex items-center justify-center text-orange-500 shadow-sm">
@@ -50,13 +59,13 @@ import {
         {/* Overview */}
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-[3px]">
           {[
-            { label: 'Enrolled',    value: overview.totalEnrolled,                color: 'bg-blue-50   text-blue-700'   },
-            { label: 'Completed',   value: overview.completedCourses,             color: 'bg-green-50  text-green-700'  },
-            { label: 'Avg Progress',value: `${overview.avgCompletion}%`,          color: 'bg-purple-50 text-purple-700' },
-            { label: 'Avg Score',   value: `${overview.avgScore}%`,              color: 'bg-yellow-50 text-yellow-700' },
+            { label: 'Enrolled',    value: overview.totalEnrolled },
+            { label: 'Completed',   value: overview.completedCourses },
+            { label: 'Avg Progress',value: `${overview.avgCompletion}%` },
+            { label: 'Avg Score',   value: `${overview.avgScore}%` },
           ].map(card => (
-            <div key={card.label} className={`rounded-xl p-4 ${card.color}`}>
-              <p className="text-xs font-medium opacity-70">{card.label}</p>
+            <div key={card.label} className="rounded-xl p-4 bg-[#08A698] text-white border border-[#08A698]">
+              <p className="text-xs font-medium text-white/75">{card.label}</p>
               <p className="text-2xl font-bold mt-1">{card.value}</p>
             </div>
           ))}
@@ -66,7 +75,15 @@ import {
         {courseProgress.map((course: any) => (
           <div key={course.courseId} className="bg-white rounded-xl border border-gray-200 p-4 space-y-4">
             <div className="flex items-center justify-between gap-2">
-              <h3 className="font-semibold text-[#111827] text-sm">{course.courseTitle}</h3>
+              <div className="min-w-0">
+                <h3 className="font-semibold text-[#111827] text-sm truncate">{course.courseTitle}</h3>
+                <Link
+                  to={`/student/courses/${course.courseId}`}
+                  className="inline-flex mt-1 text-xs font-medium text-[#08A696] hover:underline"
+                >
+                  See progress →
+                </Link>
+              </div>
               <div className="flex gap-3">
                 <span className={`text-xs px-2 py-1 rounded-full font-medium ${
                   course.pace === 'Fast'    ? 'bg-green-100  text-green-700'  :

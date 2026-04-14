@@ -50,14 +50,14 @@ const riskColors: Record<string, string> = {
         {/* Overview cards */}
         <div className="grid grid-cols-2 lg:grid-cols-5 gap-4">
           {[
-            { label: 'Total Courses',    value: overview.totalCourses,       color: 'bg-blue-50  text-blue-700'  },
-            { label: 'Total Students',   value: overview.totalStudents,      color: 'bg-green-50 text-green-700' },
-            { label: 'Avg Completion',   value: `${overview.avgCompletionRate}%`, color: 'bg-purple-50 text-purple-700' },
-            { label: 'Avg Score',        value: `${overview.avgScore}%`,     color: 'bg-yellow-50 text-yellow-700' },
-            { label: 'At Risk Students', value: overview.totalAtRisk,        color: 'bg-red-50   text-red-700'   },
+            { label: 'Total Courses',    value: overview.totalCourses },
+            { label: 'Total Students',   value: overview.totalStudents },
+            { label: 'Avg Completion',   value: `${overview.avgCompletionRate}%` },
+            { label: 'Avg Score',        value: `${overview.avgScore}%` },
+            { label: 'At Risk Students', value: overview.totalAtRisk },
           ].map(card => (
-            <div key={card.label} className={`rounded-xl p-4 ${card.color}`}>
-              <p className="text-xs font-medium opacity-70">{card.label}</p>
+            <div key={card.label} className="rounded-xl p-4 bg-[#08A698] text-white border border-[#08A698]">
+              <p className="text-xs font-medium text-white/75">{card.label}</p>
               <p className="text-2xl font-bold mt-1">{card.value}</p>
             </div>
           ))}

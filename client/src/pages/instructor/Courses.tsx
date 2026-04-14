@@ -53,11 +53,7 @@ const Courses = () => {
           {courses.map((course) => {
             const badge = course.isPublished ? 'PUBLISHED' : 'DRAFT'
             return (
-              <Link
-                key={course.id}
-                to={`/instructor/courses/${course.id}`}
-                className="rounded-lg border border-gray-200 bg-white p-3 hover:shadow-sm transition"
-              >
+              <div key={course.id} className="rounded-lg border border-gray-200 bg-white p-3 hover:shadow-sm transition">
                 <div className="flex items-start justify-between gap-2">
                   <h2 className="text-lg font-semibold text-[#111827] line-clamp-2 leading-snug">{course.title}</h2>
                   <span className={`rounded-full px-1.5 py-0.5 text-[10px] font-medium shrink-0 ${statusStyles[badge]}`}>
@@ -68,9 +64,18 @@ const Courses = () => {
                 <p className="text-xs text-gray-600 mt-1.5 line-clamp-2 leading-snug">{course.description}</p>
 
                 <div className="mt-2 text-[10px] text-gray-600">
-                  {course._count?.modules ?? 0} modules � {course._count?.enrollments ?? 0} students
+                  {course._count?.modules ?? 0} modules - {course._count?.enrollments ?? 0} students
                 </div>
-              </Link>
+
+                <div className="mt-3 flex items-center gap-2">
+                  <Link
+                    to={`/instructor/courses/${course.id}`}
+                    className="rounded-md border border-[#111827] bg-[#111827] px-3 py-1.5 text-xs font-medium text-white hover:opacity-90"
+                  >
+                    View
+                  </Link>
+                </div>
+              </div>
             )
           })}
         </div>

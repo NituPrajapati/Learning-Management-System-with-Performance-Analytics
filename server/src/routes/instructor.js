@@ -3,6 +3,8 @@ import { protect, allowRoles } from "../middleware/authMiddleware.js";
 import prisma from "../prisma.js";
 import { notifyCourseStudents } from "../utils/notify.js";
 import { uploadVideo, uploadPDF, uploadToCloudinary } from '../config/cloudinary.js'
+import multer from 'multer'
+import cloudinary from '../config/cloudinary.js'
 
 
 const router = express.Router();
@@ -294,6 +296,61 @@ router.put("/modules/:id", async (req, res) => {
   }
 });
 
+// DELETE /api/instructor/modules/:id - Delete module (+ cascades quiz)
+router.delete("/modules/:id", async (req, res) => {
+  try {
+    const { id } = req.params
+    const moduleId = parseInt(id)
+
+    if (isNaN(moduleId)) {
+      return res.status(400).json({ message: "Invalid module ID" })
+    }
+
+    const module = await prisma.module.findUnique({
+      where: { id: moduleId },
+      include: { course: true },
+    })
+
+    if (!module) {
+      return res.status(404).json({ message: "Module not found" })
+    }
+
+    if (module.course.instructorId !== req.user.id) {
+      return res.status(403).json({ message: "You don't have permission to delete this module" })
+    }
+
+    // Delete uploaded asset from Cloudinary (if present) before DB delete.
+    // Stored `publicId` comes from Cloudinary upload response.
+    if (module.publicId) {
+      const resource_type =
+        module.contentType === 'VIDEO'
+          ? 'video'
+          : module.contentType === 'PDF'
+            ? 'raw'
+            : 'image'
+
+      const r = await cloudinary.uploader.destroy(module.publicId, {
+        resource_type,
+        invalidate: true,
+      })
+
+      // Cloudinary returns { result: 'ok'|'not found'|... }
+      if (r?.result && !['ok', 'not found'].includes(r.result)) {
+        return res.status(500).json({
+          message: `Failed to delete file from Cloudinary (${String(r.result)})`,
+        })
+      }
+    }
+
+    await prisma.module.delete({ where: { id: moduleId } })
+
+    return res.json({ message: "Module deleted successfully (DB + Cloudinary)" })
+  } catch (error) {
+    console.error("Delete module error", error)
+    return res.status(500).json({ message: "Failed to delete module" })
+  }
+})
+
 // PATCH /api/instructor/courses/:id/publish - Publish/unpublish course
 router.patch("/courses/:id/publish", async (req, res) => {
   try {
@@ -392,6 +449,26 @@ router.post('/upload/pdf',
     }
   }
 )
+
+// Multer error handler for instructor uploads (size/type)
+router.use((err, _req, res, next) => {
+  if (err instanceof multer.MulterError) {
+    if (err.code === 'LIMIT_FILE_SIZE') {
+      // Both video and pdf go through multer; message depends on field name when possible.
+      return res.status(400).json({ message: 'File too large. Please upload under the allowed size.' })
+    }
+    return res.status(400).json({ message: err.message || 'Upload failed' })
+  }
+  if (err && typeof err.message === 'string') {
+    if (/only pdf/i.test(err.message)) {
+      return res.status(400).json({ message: 'Only PDF files are allowed.' })
+    }
+    if (/only video/i.test(err.message)) {
+      return res.status(400).json({ message: 'Only video files are allowed.' })
+    }
+  }
+  return next(err)
+})
 
 export default router;
 

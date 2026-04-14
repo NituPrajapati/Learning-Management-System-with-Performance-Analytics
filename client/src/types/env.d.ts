@@ -14,9 +14,8 @@ export interface AuthUser {
   email: string
   role: Role
 }
-// ─────────────────────────────────────────
+
 // USER TYPES
-// ─────────────────────────────────────────
 export interface User {
   id: number
   name: string
@@ -27,18 +26,16 @@ export interface User {
   createdAt?: string
 }
 
-// ─────────────────────────────────────────
+
 // NAV TYPES
-// ─────────────────────────────────────────
 export interface NavItem {
   label: string
   path: string
   icon: import('react').ReactNode
 }
 
-// ─────────────────────────────────────────
+
 // COURSE TYPES
-// ─────────────────────────────────────────
 export interface Course {
   id: number
   title: string
@@ -56,9 +53,8 @@ export interface Course {
   }
 }
 
-// ─────────────────────────────────────────
+
 // MODULE TYPES
-// ─────────────────────────────────────────
 export interface Module {
   id: number
   title: string
@@ -73,9 +69,8 @@ export interface Module {
   quiz?: Quiz
 }
 
-// ─────────────────────────────────────────
+
 // QUIZ TYPES
-// ─────────────────────────────────────────
 export interface Quiz {
   id: number
   title: string
@@ -117,9 +112,8 @@ export interface QuizAttempt {
   answers: { questionId: number; selectedOptionId: number }[]
 }
 
-// ─────────────────────────────────────────
+
 // ENROLLMENT TYPES
-// ─────────────────────────────────────────
 export interface Enrollment {
   id: number
   studentId: number
@@ -132,9 +126,8 @@ export interface Enrollment {
   student?: User
 }
 
-// ─────────────────────────────────────────
+
 // PROGRESS TYPES
-// ─────────────────────────────────────────
 export interface ModuleProgress {
   id: number
   studentId: number
@@ -146,9 +139,8 @@ export interface ModuleProgress {
   timeSpent: number
 }
 
-// ─────────────────────────────────────────
+
 // ANALYTICS TYPES
-// ─────────────────────────────────────────
 export interface StudentAnalytics {
   studentId: number
   studentName: string
@@ -169,9 +161,8 @@ export interface CourseAnalytics {
   dropoutRate: number
 }
 
-// ─────────────────────────────────────────
+
 // API RESPONSE TYPES
-// ─────────────────────────────────────────
 export interface ApiResponse<T> {
   data: T
   message?: string
@@ -182,9 +173,8 @@ export interface AuthResponse {
   token: string
 }
 
-// ─────────────────────────────────────────
+
 // STAT CARD TYPES
-// ─────────────────────────────────────────
 export interface StatCardProps {
   title: string
   value: string | number

@@ -199,3 +199,8 @@ export const createCourseModule = async (
   return res.data
 }
 
+export const deleteInstructorModule = async (moduleId: number): Promise<{ message: string }> => {
+  const res = await api.delete(`/api/instructor/modules/${moduleId}`)
+  return res.data
+}
+

@@ -198,9 +198,6 @@ function CourseCard({ course }: { course: Course }) {
               ? 'Unpublish'
               : 'Publish'}
         </button>
-        <button className="px-3 py-1 rounded-md border border-gray-300 bg-white text-[#111827] hover:bg-[#F2F4F7] transition text-sm">
-          Edit
-        </button>
         <Link
           to={`/instructor/courses/${course.id}`}
           className="px-3 py-1 rounded-md border border-gray-300 bg-white text-[#111827] hover:bg-[#F2F4F7] transition text-sm"

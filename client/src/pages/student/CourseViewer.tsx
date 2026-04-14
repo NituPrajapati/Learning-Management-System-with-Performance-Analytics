@@ -6,6 +6,8 @@ import VideoTab from '../../components/courses/VideoTab'
 import NotesTab from '../../components/courses/NotesTab'
 import ChatTab from '../../components/courses/ChatTab'
 import QuizViewer from '../../components/courses/Quiz'
+import { useCourseExams } from '../../hooks/useExams'
+import ExamViewer from '../../components/courses/ExamViewer.tsx'
 
 type Tab = 'video' | 'notes' | 'quiz' | 'chat'
 
@@ -19,6 +21,7 @@ const CourseViewer = () => {
 
   const { data: courseData, isLoading: courseLoading } = useCourse(courseId)
   const { data: modules, isLoading: modulesLoading } = useModules(courseId)
+  const { data: examData } = useCourseExams(courseId)
 
   const isLoading = courseLoading || modulesLoading
 
@@ -35,6 +38,8 @@ const CourseViewer = () => {
   const quizModuleCandidates = modules ?? []
   const effectiveQuizModuleId =
     quizModuleId ?? quizModuleCandidates[0]?.id ?? null
+  const exams = examData?.exams ?? []
+  const [activeExamId, setActiveExamId] = useState<number | null>(null)
 
   if (isLoading) return (
     <div className="flex items-center justify-center h-64">
@@ -113,32 +118,80 @@ const CourseViewer = () => {
           )}
           {activeTab === 'quiz' && (
             <div className="space-y-4">
-              {quizModuleCandidates.length === 0 ? (
-                <p className="text-sm text-gray-600 text-center py-8">No modules in this course yet.</p>
-              ) : (
-                <>
-                  <div>
-                    <label className="block text-xs font-medium text-gray-600 mb-1">Module</label>
-                    <select
-                      value={effectiveQuizModuleId ?? ''}
-                      onChange={(e) => setQuizModuleId(Number(e.target.value))}
-                      className="w-full max-w-md rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-[#111827]"
-                    >
-                      {quizModuleCandidates.map((m) => (
-                        <option key={m.id} value={m.id}>
-                          {m.orderIndex}. {m.title} ({m.contentType})
-                        </option>
-                      ))}
-                    </select>
-                    <p className="text-xs text-gray-500 mt-2">
-                      Pick the module that has a quiz. If none was added by your instructor, you will see &quot;No quiz&quot; below.
-                    </p>
-                  </div>
-                  {effectiveQuizModuleId != null && (
-                    <QuizViewer moduleId={effectiveQuizModuleId} courseId={courseId} />
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                <div className="rounded-xl border border-gray-200 bg-white p-4 space-y-3">
+                  <h3 className="font-semibold text-[#111827]">Module Quizzes</h3>
+                  {quizModuleCandidates.length === 0 ? (
+                    <p className="text-sm text-gray-600">No modules in this course yet.</p>
+                  ) : (
+                    <>
+                      <div>
+                        <label className="block text-xs font-medium text-gray-600 mb-1">Module</label>
+                        <select
+                          value={effectiveQuizModuleId ?? ''}
+                          onChange={(e) => setQuizModuleId(Number(e.target.value))}
+                          className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-[#111827]"
+                        >
+                          {quizModuleCandidates.map((m) => (
+                            <option key={m.id} value={m.id}>
+                              {m.orderIndex}. {m.title} ({m.contentType})
+                            </option>
+                          ))}
+                        </select>
+                        <p className="text-xs text-gray-500 mt-2">
+                          Pick the module that has a quiz. If none was added by your instructor, you will see “No quiz”.
+                        </p>
+                      </div>
+                      {effectiveQuizModuleId != null && (
+                        <QuizViewer moduleId={effectiveQuizModuleId} courseId={courseId} />
+                      )}
+                    </>
                   )}
-                </>
-              )}
+                </div>
+
+                <div className="rounded-xl border border-gray-200 bg-white p-4 space-y-3">
+                  <h3 className="font-semibold text-[#111827]">Course Exams</h3>
+                  {exams.length === 0 ? (
+                    <p className="text-sm text-gray-600">No exams created yet.</p>
+                  ) : (
+                    <>
+                      <div className="space-y-2">
+                        {exams.map((ex) => (
+                          <button
+                            key={ex.id}
+                            type="button"
+                            onClick={() => setActiveExamId(ex.id)}
+                            disabled={ex.locked}
+                            className={`w-full rounded-lg border px-3 py-2 text-left text-sm transition ${
+                              activeExamId === ex.id
+                                ? 'border-[#08A696] bg-[#E6FAF7]'
+                                : 'border-gray-200 bg-white hover:bg-[#F2F4F7]'
+                            } ${ex.locked ? 'opacity-60 cursor-not-allowed' : ''}`}
+                          >
+                            <div className="flex items-center justify-between gap-2">
+                              <span className="font-medium text-[#111827]">{ex.title}</span>
+                              <span className="text-[11px] px-2 py-0.5 rounded-full bg-gray-100 text-gray-700">
+                                {ex.difficulty}
+                              </span>
+                            </div>
+                            <div className="text-[11px] text-gray-600 mt-1">
+                              {ex.attempted
+                                ? `Attempted • ${Math.round(ex.attempt?.percentage ?? 0)}%`
+                                : ex.locked
+                                  ? 'Locked: complete previous difficulty first'
+                                  : 'Available (one attempt)'}
+                            </div>
+                          </button>
+                        ))}
+                      </div>
+
+                      {activeExamId != null && (
+                        <ExamViewer examId={activeExamId} courseId={courseId} />
+                      )}
+                    </>
+                  )}
+                </div>
+              </div>
             </div>
           )}
           {activeTab === 'chat' && (

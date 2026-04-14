@@ -10,6 +10,159 @@ const router = express.Router();
 router.use(protect);
 router.use(allowRoles('STUDENT'));
 
+function clamp(n, min, max) {
+  return Math.max(min, Math.min(max, n))
+}
+
+function gradeFromPercent(pct) {
+  const p = Number(pct) || 0
+  if (p >= 90) return 'A+'
+  if (p >= 80) return 'A'
+  if (p >= 70) return 'B'
+  if (p >= 60) return 'C'
+  if (p >= 50) return 'D'
+  return 'E'
+}
+
+function suggestionFromWeakest(components) {
+  // components: [{ key, label, score0to100 }]
+  const sorted = [...components].sort((a, b) => a.score0to100 - b.score0to100)
+  const weakest = sorted[0]
+  if (!weakest) return 'Keep going — you are doing great.'
+  if (weakest.key === 'completion') return 'Focus on completing modules consistently to improve overall performance.'
+  if (weakest.key === 'quiz') return 'Revise concepts and practice quizzes to raise your scores.'
+  if (weakest.key === 'engagement') return 'Increase daily learning streak and participate in course discussions to earn bonus points.'
+  if (weakest.key === 'exam') return 'Prepare well for the next exam difficulty level and attempt it when ready.'
+  return 'Work on consistency and practice to improve.'
+}
+
+// GET /api/student/me/report — overall performance report
+router.get('/me/report', async (req, res) => {
+  try {
+    const studentId = req.user.id
+
+    const student = await prisma.user.findUnique({
+      where: { id: studentId },
+      select: { id: true, name: true, email: true },
+    })
+    if (!student) return res.status(404).json({ message: 'Student not found' })
+
+    const enrollments = await prisma.enrollment.findMany({
+      where: { studentId, status: { not: 'DROPPED' } },
+      include: { course: { select: { id: true, title: true } } },
+      orderBy: { enrolledAt: 'desc' },
+    })
+
+    const streakRow = await prisma.studentProgress.findUnique({
+      where: { studentId },
+      select: { streak: true, lastVisit: true },
+    })
+    const streak = streakRow?.streak ?? 0
+
+    const chatRows = await prisma.chatEngagement.findMany({
+      where: { studentId },
+      select: { courseId: true, score: true },
+    })
+    const chatByCourseId = new Map(chatRows.map((r) => [r.courseId, r.score]))
+
+    // Bonus (10%): 5% streak + 5% chat, both capped.
+    const streakBonus5 = clamp((streak / 10) * 5, 0, 5) // 10-day streak => full 5%
+
+    const courseReports = await Promise.all(
+      enrollments.map(async (e) => {
+        const courseId = e.courseId
+
+        // Quiz avg score: recompute from attempts for this course (more reliable than cached quizAvgScore).
+        const quizAttempts = await prisma.quizAttempt.findMany({
+          where: { studentId, quiz: { module: { courseId } } },
+          select: { percentage: true },
+        })
+        const avgQuiz = quizAttempts.length
+          ? quizAttempts.reduce((s, a) => s + a.percentage, 0) / quizAttempts.length
+          : 0
+
+        // Exam: best/latest attempt among difficulties (only one attempt each).
+        const examAttempts = await prisma.courseExamAttempt.findMany({
+          where: { studentId, exam: { courseId } },
+          include: { exam: { select: { difficulty: true, title: true } } },
+          orderBy: { submittedAt: 'desc' },
+        })
+        const bestExam = examAttempts[0] || null
+        const examPct = bestExam?.percentage ?? 0
+        const examDifficulty = bestExam?.exam?.difficulty ?? null
+
+        // 50% factors: completion + quizzes (simple and transparent)
+        const completionPct = Number(e.completionRate) || 0
+        const factor50 =
+          (clamp(completionPct, 0, 100) * 0.25) + // up to 25
+          (clamp(avgQuiz, 0, 100) * 0.25)         // up to 25
+
+        // Chat bonus 5% (per-course, scaled)
+        const chatScore = chatByCourseId.get(courseId) ?? 0
+        const chatBonus5 = clamp((chatScore / 50) * 5, 0, 5) // score 50 => full 5%
+
+        const bonus10 = streakBonus5 + chatBonus5 // max 10
+
+        // Exam 40%
+        const exam40 = clamp(examPct, 0, 100) * 0.4
+
+        const overall = clamp(factor50 + bonus10 + exam40, 0, 100)
+
+        const components = [
+          { key: 'completion', label: 'Completion', score0to100: completionPct },
+          { key: 'quiz', label: 'Quizzes', score0to100: avgQuiz },
+          { key: 'engagement', label: 'Streak & Chat', score0to100: (bonus10 / 10) * 100 },
+          { key: 'exam', label: 'Exam', score0to100: examPct },
+        ]
+
+        const examLabel =
+          examDifficulty === 'EASY'
+            ? 'Good'
+            : examDifficulty === 'INTERMEDIATE'
+              ? 'Better'
+              : examDifficulty === 'ADVANCED'
+                ? 'Excellent'
+                : 'Not attempted'
+
+        return {
+          courseId,
+          courseTitle: e.course.title,
+          completionRate: Math.round(completionPct),
+          avgQuizScore: Math.round(avgQuiz),
+          streak,
+          chatEngagementScore: chatScore,
+          bonus10: Math.round(bonus10),
+          exam: bestExam
+            ? {
+                title: bestExam.exam?.title ?? null,
+                difficulty: examDifficulty,
+                percentage: Math.round(examPct),
+                label: examLabel,
+              }
+            : null,
+          breakdown: {
+            factor50: Math.round(factor50),
+            bonus10: Math.round(bonus10),
+            exam40: Math.round(exam40),
+          },
+          overall: Math.round(overall),
+          grade: gradeFromPercent(overall),
+          suggestion: suggestionFromWeakest(components),
+        }
+      })
+    )
+
+    return res.json({
+      student,
+      streak: { streak, lastVisit: streakRow?.lastVisit ?? null },
+      courses: courseReports,
+    })
+  } catch (e) {
+    console.error('student report', e)
+    return res.status(500).json({ message: 'Failed to build report' })
+  }
+})
+
 // POST /api/student/me/daily-visit — streak + lastVisit (idempotent per UTC day for streak count)
 router.post("/me/daily-visit", async (req, res) => {
   try {

@@ -1,5 +1,6 @@
 import { useAuthStore } from '../../../stores/authStore'
 import type { ChatMessage } from './types'
+import { formatTimeIST } from '../../../utils/time'
 
 interface Props {
   message: ChatMessage
@@ -16,7 +17,7 @@ const MessageItem = ({ message, onReply }: Props) => {
       <div className={`max-w-[80%] rounded-xl px-3 py-2 border ${mine ? 'bg-[#111827] text-white border-[#111827]' : 'bg-white border-gray-200 text-[#111827]'}`}>
         <div className={`text-[11px] mb-1 ${mine ? 'text-white/80' : 'text-gray-500'} flex items-center gap-2`}>
           <span className="font-semibold">{displayName}</span>
-          <span>{new Date(message.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
+          <span>{formatTimeIST(message.createdAt)}</span>
         </div>
         <p className="text-sm whitespace-pre-wrap break-words">{message.message}</p>
         {!mine && typeof message.id === 'number' && (

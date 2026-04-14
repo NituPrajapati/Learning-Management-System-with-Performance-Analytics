@@ -31,10 +31,22 @@ const AddModuleForm = ({ courseId, onSuccess }: Props) => {
   const [error,          setError]          = useState('')
   const [fileName,       setFileName]       = useState('')
 
+  const MAX_VIDEO_BYTES = 100 * 1024 * 1024
+  const MAX_PDF_BYTES = 50 * 1024 * 1024
+
   const handleFileUpload = async (
     file: File,
     type: 'video' | 'pdf'
   ) => {
+    if (type === 'video' && file.size > MAX_VIDEO_BYTES) {
+      setError('Please upload max 100MB video for Cloudinary.')
+      return
+    }
+    if (type === 'pdf' && file.size > MAX_PDF_BYTES) {
+      setError('Please upload PDF under 50MB.')
+      return
+    }
+
     setIsUploading(true)
     setUploadProgress(0)
     setError('')
@@ -92,7 +104,7 @@ const AddModuleForm = ({ courseId, onSuccess }: Props) => {
         contentType: form.contentType,
         contentUrl:  form.contentUrl  || undefined,
         contentText: form.contentText || undefined,
-        duration:    form.duration ? parseInt(form.duration) : undefined,
+        duration:    form.contentType === 'VIDEO' && form.duration ? parseInt(form.duration) : undefined,
         publicId:    uploadedPublicId || undefined,
         fileSize:    uploadedSize     || undefined,
         courseId,
@@ -145,7 +157,7 @@ const AddModuleForm = ({ courseId, onSuccess }: Props) => {
         />
       </div>
 
-      {/* Content Type + Duration */}
+      {/* Content Type + Duration (VIDEO only) */}
       <div className="grid grid-cols-2 gap-3">
         <div>
           <label className="block text-xs font-medium text-[#6B6A66] mb-1">
@@ -154,7 +166,7 @@ const AddModuleForm = ({ courseId, onSuccess }: Props) => {
           <select
             value={form.contentType}
             onChange={e => {
-              setForm({ ...form, contentType: e.target.value as ContentType, contentUrl: '' })
+              setForm({ ...form, contentType: e.target.value as ContentType, contentUrl: '', duration: e.target.value === 'VIDEO' ? form.duration : '' })
               setUploadedUrl('')
               setFileName('')
               setUploadProgress(0)
@@ -167,19 +179,21 @@ const AddModuleForm = ({ courseId, onSuccess }: Props) => {
             <option value="LINK">🔗 Link</option>
           </select>
         </div>
-        <div>
-          <label className="block text-xs font-medium text-[#6B6A66] mb-1">
-            Duration (minutes)
-          </label>
-          <input
-            type="number"
-            value={form.duration}
-            onChange={e => setForm({ ...form, duration: e.target.value })}
-            placeholder="e.g. 30"
-            min="1"
-            className="w-full rounded-lg border border-[#D4D2CC] px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-[#08A696] bg-white"
-          />
-        </div>
+        {form.contentType === 'VIDEO' && (
+          <div>
+            <label className="block text-xs font-medium text-[#6B6A66] mb-1">
+              Duration (minutes)
+            </label>
+            <input
+              type="number"
+              value={form.duration}
+              onChange={e => setForm({ ...form, duration: e.target.value })}
+              placeholder="e.g. 30"
+              min="1"
+              className="w-full rounded-lg border border-[#D4D2CC] px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-[#08A696] bg-white"
+            />
+          </div>
+        )}
       </div>
 
       {/* VIDEO upload */}
@@ -260,7 +274,7 @@ const AddModuleForm = ({ courseId, onSuccess }: Props) => {
       {form.contentType === 'PDF' && (
         <div>
           <label className="block text-xs font-medium text-[#6B6A66] mb-1">
-            Upload PDF (max 20MB)
+            Upload PDF (max 50MB)
           </label>
           <input
             ref={pdfRef}
@@ -280,7 +294,7 @@ const AddModuleForm = ({ courseId, onSuccess }: Props) => {
             >
               <p className="text-2xl mb-2">📄</p>
               <p className="text-sm text-[#6B6A66]">Click to upload PDF</p>
-              <p className="text-xs text-[#6B6A66] mt-1">PDF up to 20MB</p>
+              <p className="text-xs text-[#6B6A66] mt-1">PDF up to 50MB</p>
             </div>
           ) : (
             <div className="bg-green-50 border border-green-200 rounded-lg p-3 flex items-center gap-3">

@@ -2,6 +2,7 @@ import { useState, useRef, useEffect, useLayoutEffect } from 'react'
 import { createPortal } from 'react-dom'
 import { MdOutlineNotificationsActive } from 'react-icons/md'
 import { useNotifications, useMarkAsRead, useMarkAllRead } from '../hooks/useNotifications'
+import { formatDateIST } from '../utils/time'
 
 const typeIcon: Record<string, string> = {
   NEW_MODULE: '📚',
@@ -157,7 +158,7 @@ const NotificationBell = () => {
                     <p className="text-sm font-medium">{n.title}</p>
                     <p className="text-xs text-gray-600 mt-0.5 line-clamp-2">{n.message}</p>
                     <p className="text-xs text-gray-500 mt-1">
-                      {new Date(n.createdAt).toLocaleDateString()}
+                      {formatDateIST(n.createdAt)}
                     </p>
                   </div>
                   {!n.isRead && (

@@ -14,6 +14,7 @@ import {
   toggleCoursePublish,
   getAllCourses,
   createCourseModule,
+  deleteInstructorModule,
   uploadInstructorPdf,
   uploadInstructorVideo,
   type ContentType,
@@ -69,6 +70,18 @@ export const useCreateCourseModule = () => {
     }) => createCourseModule(courseId, data),
     onSuccess: (_res, variables) => {
       queryClient.invalidateQueries({ queryKey: ['course', variables.courseId] })
+    },
+  })
+}
+
+// Instructor: Delete module (also deletes quiz via cascade)
+export const useDeleteInstructorModule = () => {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: async ({ moduleId }: { moduleId: number }) => deleteInstructorModule(moduleId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['course'] })
+      queryClient.invalidateQueries({ queryKey: ['instructorCourses'] })
     },
   })
 }

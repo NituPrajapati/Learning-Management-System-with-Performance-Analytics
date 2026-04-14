@@ -14,6 +14,7 @@ import quizRoutes         from './routes/quiz.js'
 import analyticsRoutes    from './routes/analytics.js'
 import notificationRoutes from './routes/notifications.js'
 import chatRoutes from './routes/chat.js'
+import examRoutes from './routes/exams.js'
 import { authMiddleware } from "./middleware/authMiddleware.js";
 import prisma from "./prisma.js";
 import morgan from "morgan"
@@ -44,6 +45,7 @@ app.use("/api/instructor", instructorRouter);
 app.use("/api/student", studentRouter);
 app.use('/api/student', studentRoutes)
 app.use('/api/quiz',          quizRoutes)
+app.use('/api/exams',         examRoutes)
 app.use('/api/analytics',     analyticsRoutes)
 app.use('/api/notifications', notificationRoutes)
 app.use('/api/chat', chatRoutes)

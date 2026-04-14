@@ -20,6 +20,7 @@ import CreateQuiz         from '../pages/instructor/CreateQuiz'
 import InstructorAnalytics from '../pages/instructor/Analytics'
 import InstructorChats     from '../pages/instructor/Chats'
 import Progress           from '../pages/student/Progress'
+import Report             from '../pages/student/Report'
 
 export function AppRoutes() {
   return (
@@ -56,6 +57,7 @@ export function AppRoutes() {
           <Route path="courses" element={<MyCourses />} />
           <Route path="courses/:id" element={<CourseViewer />} />
           <Route path="progress" element={<Progress />} />
+          <Route path="report" element={<Report />} />
         </Route>
       </Route>
  

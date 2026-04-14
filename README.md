@@ -3,13 +3,15 @@
 A full-stack Learning Management System with role-based access for **Admin**, **Instructor**, and **Student** users.
 
 The project includes:
-- Course creation and publishing
+- Course creation, publishing, and owner-only course editing
 - Student enrollment and saved courses
-- Instructor module management
-- Video and PDF upload via Cloudinary
+- Instructor module management (create + delete with Cloudinary cleanup)
+- Video and PDF upload via Cloudinary (with size limits + validation)
 - Student course viewer with tab navigation (Video, Notes, Chat, Quiz)
 - Progress tracking + activity logs + analytics
 - Real-time **course chat** and **notifications** using **Socket.IO**
+- Course **Exams** (Easy -> Intermediate -> Advanced progression; one attempt each)
+- Student **Performance Report** (breakdown + suggestions)
 
 ## Tech Stack
 
@@ -115,6 +117,7 @@ Frontend runs on Vite default URL (usually `http://localhost:5173`).
 - `PATCH /api/instructor/courses/:id/publish`
 - `POST /api/instructor/courses/:id/modules`
 - `PUT /api/instructor/modules/:id`
+- `DELETE /api/instructor/modules/:id` (deletes module + quiz; also deletes Cloudinary asset if `publicId` exists)
 - `POST /api/instructor/upload/video`
 - `POST /api/instructor/upload/pdf`
 
@@ -125,6 +128,18 @@ Frontend runs on Vite default URL (usually `http://localhost:5173`).
 - `POST /api/student/me/saved-courses/:courseId`
 - `DELETE /api/student/me/saved-courses/:courseId`
 - `POST /api/student/progress`
+- `GET /api/student/me/report` (performance report)
+
+### Exams
+- `POST /api/exams/course/:courseId` (INSTRUCTOR/ADMIN)
+- `GET /api/exams/course/:courseId` (STUDENT)
+- `GET /api/exams/:examId` (STUDENT)
+- `POST /api/exams/:examId/submit` (STUDENT, one attempt)
+
+Exam rules (current):
+- Instructors create exam with title, difficulty, duration, and full question/options payload.
+- Exam duration validation: **1 to 180 minutes**.
+- Difficulty unlock is currently by completing previous level attempt (Easy -> Intermediate -> Advanced).
 
 ### Chat
 - `GET /api/chat/:courseId/messages?cursor=<id>&limit=<n>` (requires access to that course)
@@ -168,9 +183,26 @@ Access rules are enforced server-side:
 - `/admin/dashboard`
 - `/instructor/dashboard`
 - `/instructor/chats` (select a course → join that course chat room)
+- `/instructor/courses/:id` (add modules, create exams, delete modules, edit course details)
 - `/student/dashboard`
 - `/student/courses`
-- `/student/courses/:id` (course viewer tabs: Video, Notes, Chat; Quiz tab scaffold-ready)
+- `/student/courses/:id` (course viewer tabs: Video, Notes, Chat, Quiz + Course Exams)
+- `/student/progress`
+- `/student/report`
+
+## Performance Report Formula
+
+Report uses:
+
+- **50% factors**: completion + quiz average (each contributes up to 25)
+- **10% bonus**: streak (up to 5) + chat engagement (up to 5)
+- **40% exam**: exam percentage × 0.4
+
+Suggestion highlights the weakest area (completion / quizzes / engagement / exam).
+
+## Timezone (IST)
+
+Key UI timestamps are rendered in **IST** (`Asia/Kolkata`) for a consistent India-friendly experience.
 
 ## Useful Scripts
 
@@ -191,7 +223,8 @@ Access rules are enforced server-side:
 - Auth state is persisted in browser storage, so opening a new tab on the same browser origin reuses the last logged-in account.
 - Upload limits are currently configured in backend:
   - Video: 100 MB
-  - PDF: 20 MB
+  - PDF: 50 MB
+- Module `duration` field is used for **VIDEO** modules only in creation UI.
 
 ## License
 
